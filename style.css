@@ -1,0 +1,118 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #ffffff;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 2px solid #4a9eff;
+}
+
+    header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        color: #4a9eff;
+    }
+
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.prototype-notice {
+    background: rgba(255, 193, 7, 0.1);
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.combo-tree-preview {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.tree-node {
+    margin: 1rem 0;
+}
+
+.node {
+    display: inline-block;
+    padding: 0.8rem 1.2rem;
+    margin: 0.3rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: transform 0.2s ease;
+}
+
+    .node:hover {
+        transform: translateY(-2px);
+    }
+
+.starter {
+    background: #28a745;
+    border: 2px solid #34ce57;
+}
+
+.combo {
+    background: #007bff;
+    border: 2px solid #4a9eff;
+}
+
+.ender {
+    background: #dc3545;
+    border: 2px solid #ff4757;
+}
+
+.branches, .sub-branches {
+    margin-left: 2rem;
+    border-left: 2px solid #4a9eff;
+    padding-left: 1rem;
+}
+
+.status {
+    background: rgba(40, 167, 69, 0.1);
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+    .status p {
+        margin: 0.5rem 0;
+        font-size: 1.1rem;
+    }
+
+#status {
+    color: #28a745;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2rem;
+    }
+
+    .branches, .sub-branches {
+        margin-left: 1rem;
+    }
+
+    main {
+        padding: 1rem;
+    }
+}
