@@ -18,6 +18,7 @@
 - `README.md` – High-level project introduction and local run instructions.
 
 ## Near-Term Notes
+- Combo sections now render from `combo-sections.json` via `combo-sections.js`; edit the JSON to add or update categories.
 - Validate the static copy in GitHub Pages after deployment; record any assets that fail to load.
 - Confirm the ASP.NET Core project launches successfully in Visual Studio. (HTTPS is disabled by default to avoid dev-certificate warnings; re-enable as needed.)
 - Plan the migration path from the static dump to a React + TypeScript implementation with modular components.
