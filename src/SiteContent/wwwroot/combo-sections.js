@@ -24,6 +24,22 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function resolveAutoFormatPreference(config) {
+  if (!config || typeof config !== 'object') {
+    return undefined;
+  }
+
+  if (config.autoFormat !== undefined) {
+    return Boolean(config.autoFormat);
+  }
+
+  if (config.disableFormatting || config.formatting === 'none') {
+    return false;
+  }
+
+  return undefined;
+}
+
 function buildWrappedHtml(text, rule) {
   if (typeof rule.replacement === 'string') {
     const escaped = escapeHtml(text);
@@ -141,14 +157,7 @@ function createFormatter(config) {
       if (typeof section.title.html === 'string') {
         titleHtml = section.title.html;
       } else {
-        const autoFormatOverride =
-          section.title.autoFormat !== undefined
-            ? Boolean(section.title.autoFormat)
-            : section.title.disableFormatting
-            ? false
-            : section.title.formatting === 'none'
-            ? false
-            : undefined;
+        const autoFormatOverride = resolveAutoFormatPreference(section.title);
         const text = section.title.text != null ? section.title.text : '';
         const formatted = formatText(text, {
           autoFormat: autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat,
@@ -192,14 +201,7 @@ function createFormatter(config) {
         if (typeof description.html === 'string') {
           html = description.html;
         } else {
-      const autoFormatOverride =
-        description.autoFormat !== undefined
-          ? Boolean(description.autoFormat)
-          : description.disableFormatting
-          ? false
-          : description.formatting === 'none'
-          ? false
-          : undefined;
+      const autoFormatOverride = resolveAutoFormatPreference(description);
       const text = description.text != null ? description.text : '';
       html = formatText(text, {
         autoFormat: autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat,
@@ -231,14 +233,7 @@ function createFormatter(config) {
       if (typeof value.html === 'string') {
         return value.html;
       }
-      const autoFormatOverride =
-        value.autoFormat !== undefined
-          ? Boolean(value.autoFormat)
-          : value.disableFormatting
-          ? false
-          : value.formatting === 'none'
-          ? false
-          : undefined;
+      const autoFormatOverride = resolveAutoFormatPreference(value);
       const text = value.text != null ? value.text : '';
       return formatText(text, {
         autoFormat: autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat,
@@ -257,9 +252,8 @@ function createFormatter(config) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
-    const columnValues = Array.isArray(section.columns_html)
-      ? section.columns_html
-      : section.columns;
+    const columnValues = Array.isArray(section.columns_html) ? section.columns_html : section.columns;
+    const columnConfigs = [];
 
     (columnValues || []).forEach((column) => {
       const th = document.createElement('th');
@@ -267,10 +261,50 @@ function createFormatter(config) {
       th.setAttribute('tabindex', '0');
       th.setAttribute('role', 'columnheader button');
       th.setAttribute('title', 'Sort ascending');
-      const html = Array.isArray(section.columns_html)
-        ? (column || '').trim()
-        : normaliseCell(column, formatText, defaultAutoFormat);
+      let html;
+      if (Array.isArray(section.columns_html)) {
+        html = (column || '').trim();
+        columnConfigs.push({});
+      } else {
+        const columnConfig = { textColor: null, autoFormat: undefined };
+        const autoFormatOverride = resolveAutoFormatPreference(column);
+
+        if (column && typeof column === 'object' && !Array.isArray(column)) {
+          if (typeof column.html === 'string') {
+            html = column.html;
+          } else {
+            const text = column.text != null ? column.text : '';
+            html = formatText(text, {
+              autoFormat:
+                autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat,
+            });
+            if (column.wrap) {
+              const tagName = column.wrap;
+              html = `<${tagName}>${html}</${tagName}>`;
+            } else if (column.before || column.after) {
+              const before = column.before || '';
+              const after = column.after || '';
+              html = `${before}${html}${after}`;
+            }
+          }
+
+          const textColor = column.text_color || column.textColor || column.color;
+          if (textColor) {
+            columnConfig.textColor = textColor;
+          }
+        } else {
+          html = normaliseCell(column, formatText, defaultAutoFormat);
+        }
+
+        columnConfig.autoFormat = autoFormatOverride;
+        columnConfigs.push(columnConfig);
+      }
+
       th.innerHTML = html;
+      const columnConfig = columnConfigs[columnConfigs.length - 1];
+      if (columnConfig && columnConfig.textColor) {
+        th.style.color = columnConfig.textColor;
+      }
       headerRow.appendChild(th);
     });
 
@@ -287,15 +321,25 @@ function createFormatter(config) {
 
       const tr = document.createElement('tr');
       if (Array.isArray(section.rows_html)) {
-        row.forEach((cellHtml) => {
+        row.forEach((cellHtml, columnIndex) => {
           const cell = document.createElement('td');
           cell.innerHTML = cellHtml || '';
+          const columnConfig = columnConfigs[columnIndex] || {};
+          if (columnConfig.textColor) {
+            cell.style.color = columnConfig.textColor;
+          }
           tr.appendChild(cell);
         });
       } else {
-        row.forEach((cellValue) => {
+        row.forEach((cellValue, columnIndex) => {
           const cell = document.createElement('td');
-          cell.innerHTML = normaliseCell(cellValue, formatText, defaultAutoFormat);
+          const columnConfig = columnConfigs[columnIndex] || {};
+          const columnAutoFormat =
+            columnConfig.autoFormat !== undefined ? columnConfig.autoFormat : defaultAutoFormat;
+          cell.innerHTML = normaliseCell(cellValue, formatText, columnAutoFormat);
+          if (columnConfig.textColor) {
+            cell.style.color = columnConfig.textColor;
+          }
           tr.appendChild(cell);
         });
       }
