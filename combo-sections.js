@@ -164,7 +164,8 @@ function createFormatter(config) {
   line-height: 1;
 }
 
-.citizen-section-indicator::before {
+.citizen-section-indicator::before,
+.combo-section__indicator::before {
   content: '';
   display: inline-block;
   width: 1em;
@@ -178,12 +179,14 @@ function createFormatter(config) {
   mask-size: contain;
 }
 
-.citizen-section-indicator.mw-ui-icon-wikimedia-collapse::before {
+.citizen-section-indicator.mw-ui-icon-wikimedia-collapse::before,
+.combo-section__indicator.mw-ui-icon-wikimedia-collapse::before {
   -webkit-mask-image: url('${COLLAPSE_ICON_MASK}');
   mask-image: url('${COLLAPSE_ICON_MASK}');
 }
 
-.citizen-section-indicator.mw-ui-icon-wikimedia-expand::before {
+.citizen-section-indicator.mw-ui-icon-wikimedia-expand::before,
+.combo-section__indicator.mw-ui-icon-wikimedia-expand::before {
   -webkit-mask-image: url('${EXPAND_ICON_MASK}');
   mask-image: url('${EXPAND_ICON_MASK}');
 }
