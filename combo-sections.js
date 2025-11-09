@@ -131,22 +131,40 @@ function createFormatter(config) {
     style.id = 'combo-section-styles';
     style.textContent = `
 .combo-section__header {
-  cursor: pointer;
+  margin: 0;
 }
 
-.combo-section__header:focus-visible {
+.combo-section__trigger {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0;
+  text-align: inherit;
+  width: 100%;
+}
+
+.combo-section__trigger:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 
-.combo-section__header::after {
+.combo-section__trigger::after {
   content: '\\25BC';
   font-size: 0.75em;
-  margin-left: 0.5rem;
 }
 
-.combo-section__header.combo-section__header--collapsed::after {
+.combo-section__trigger.combo-section__trigger--collapsed::after {
   content: '\\25B6';
+}
+
+.combo-section__content[hidden] {
+  display: none !important;
 }
 `;
 
@@ -1152,14 +1170,21 @@ function createFormatter(config) {
 
     const header = createHeader(section, formatText, defaultAutoFormat);
     header.classList.add('combo-section__header');
-    header.setAttribute('role', 'button');
-    header.setAttribute('tabindex', '0');
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'combo-section__trigger';
+
+    while (header.firstChild) {
+      trigger.appendChild(header.firstChild);
+    }
+    header.appendChild(trigger);
 
     const baseId =
       (section && (section.headline_id || section.anchor)) || `combo-section-${index}`;
     const contentId = `${String(baseId).replace(/\s+/g, '-')}-content`;
-    header.setAttribute('aria-controls', contentId);
-    header.setAttribute('aria-expanded', 'true');
+    trigger.setAttribute('aria-controls', contentId);
+    trigger.setAttribute('aria-expanded', 'true');
 
     const content = document.createElement('div');
     content.className = 'combo-section__content';
@@ -1178,22 +1203,22 @@ function createFormatter(config) {
     const setCollapsed = (collapsed) => {
       if (collapsed) {
         content.setAttribute('hidden', '');
-        header.setAttribute('aria-expanded', 'false');
-        header.classList.add('combo-section__header--collapsed');
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.classList.add('combo-section__trigger--collapsed');
       } else {
         content.removeAttribute('hidden');
-        header.setAttribute('aria-expanded', 'true');
-        header.classList.remove('combo-section__header--collapsed');
+        trigger.setAttribute('aria-expanded', 'true');
+        trigger.classList.remove('combo-section__trigger--collapsed');
       }
     };
 
     const toggleCollapsed = () => {
-      const isCollapsed = header.getAttribute('aria-expanded') === 'false';
+      const isCollapsed = trigger.getAttribute('aria-expanded') === 'false';
       setCollapsed(!isCollapsed);
     };
 
-    header.addEventListener('click', toggleCollapsed);
-    header.addEventListener('keydown', (event) => {
+    trigger.addEventListener('click', toggleCollapsed);
+    trigger.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
         event.preventDefault();
         toggleCollapsed();
