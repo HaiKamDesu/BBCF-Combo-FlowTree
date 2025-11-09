@@ -159,9 +159,13 @@ function createFormatter(config) {
   line-height: 1;
 }
 
-.section-spacing,
-.combo-section__spacer {
+.section-spacing {
   height: 1.75rem;
+  width: 100%;
+}
+
+.combo-section__spacer {
+  height: 0.875rem;
   width: 100%;
 }
 
@@ -175,14 +179,14 @@ function createFormatter(config) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 1.75rem 0 0.75rem;
+  margin: 0.875rem 0 0.5rem;
   font-size: 1rem;
   font-weight: 500;
   margin-left: 1.75rem !important;
 }
 
 .combo-section__header--collapsed {
-  margin-bottom: 1.75rem;
+  margin-bottom: 0.875rem;
 }
 
 .citizen-section-heading + .citizen-section .combo-section__header:first-child {
@@ -190,10 +194,13 @@ function createFormatter(config) {
 }
 
 .combo-section__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.95em;
   line-height: 1;
-  min-width: 1em;
-  text-align: center;
+  min-width: 1.25em;
+  width: 1.25em;
 }
 
 .combo-section__content {
@@ -222,6 +229,18 @@ function createFormatter(config) {
   };
 
   const CITIZEN_TOGGLE_DATA_KEY = 'citizenToggleInitialised';
+
+  const applyIndicatorState = (indicator, collapsed) => {
+    if (!indicator) {
+      return;
+    }
+    indicator.textContent = '';
+    indicator.classList.add('citizen-ui-icon', 'mw-ui-icon');
+    indicator.classList.toggle('mw-ui-icon-wikimedia-expand', collapsed);
+    indicator.classList.toggle('mw-ui-icon-wikimedia-collapse', !collapsed);
+    indicator.classList.toggle('mw-ui-icon-wikimedia-arrowUp', collapsed);
+    indicator.classList.toggle('mw-ui-icon-wikimedia-arrowDown', !collapsed);
+  };
 
   const initialiseCitizenSectionHeading = (heading) => {
     if (!heading || heading.dataset[CITIZEN_TOGGLE_DATA_KEY] === 'true') {
@@ -267,7 +286,7 @@ function createFormatter(config) {
       : null;
 
     const updateIndicator = (collapsed) => {
-      indicatorElement.textContent = collapsed ? '↑' : '↓';
+      applyIndicatorState(indicatorElement, collapsed);
     };
 
     const setCollapsed = (collapsed) => {
@@ -1329,7 +1348,6 @@ function createFormatter(config) {
     const indicator = document.createElement('span');
     indicator.className = 'combo-section__indicator';
     indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '↓';
     header.insertBefore(indicator, header.firstChild);
 
     const baseId =
@@ -1356,16 +1374,15 @@ function createFormatter(config) {
 
     const setCollapsed = (collapsed) => {
       if (collapsed) {
-        indicator.textContent = '↑';
         content.setAttribute('hidden', '');
         header.setAttribute('aria-expanded', 'false');
         header.classList.add('combo-section__header--collapsed');
       } else {
-        indicator.textContent = '↓';
         content.removeAttribute('hidden');
         header.setAttribute('aria-expanded', 'true');
         header.classList.remove('combo-section__header--collapsed');
       }
+      applyIndicatorState(indicator, collapsed);
     };
 
     const toggleCollapsed = () => {
@@ -1398,7 +1415,7 @@ function createFormatter(config) {
     const spacer = document.createElement('div');
     spacer.className = 'combo-section__spacer';
     spacer.setAttribute('aria-hidden', 'true');
-    spacer.style.height = '1.75rem';
+    spacer.style.height = '0.875rem';
     fragment.appendChild(spacer);
     return fragment;
   };
