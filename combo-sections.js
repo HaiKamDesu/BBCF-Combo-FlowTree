@@ -131,36 +131,13 @@ function createFormatter(config) {
     style.id = 'combo-section-styles';
     style.textContent = `
 .combo-section__header {
+  cursor: pointer;
   margin: 0;
 }
 
-.combo-section__trigger {
-  align-items: center;
-  background: none;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  font: inherit;
-  gap: 0.5rem;
-  justify-content: space-between;
-  padding: 0;
-  text-align: inherit;
-  width: 100%;
-}
-
-.combo-section__trigger:focus-visible {
+.combo-section__header:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
-}
-
-.combo-section__trigger::after {
-  content: '\\25BC';
-  font-size: 0.75em;
-}
-
-.combo-section__trigger.combo-section__trigger--collapsed::after {
-  content: '\\25B6';
 }
 
 .combo-section__content[hidden] {
@@ -191,12 +168,12 @@ function createFormatter(config) {
     });
 
   const createHeader = (section, formatText, defaultAutoFormat) => {
-    const header = document.createElement('h3');
+    const fragment = document.createDocumentFragment();
 
     if (section.anchor) {
       const anchor = document.createElement('span');
       anchor.id = section.anchor;
-      header.appendChild(anchor);
+      fragment.appendChild(anchor);
     }
 
     const headline = document.createElement('span');
@@ -231,9 +208,9 @@ function createFormatter(config) {
       titleHtml = formatText(text, { autoFormat: defaultAutoFormat });
     }
     headline.innerHTML = titleHtml;
-    header.appendChild(headline);
+    fragment.appendChild(headline);
 
-    return header;
+    return fragment;
   };
 
   const createDescriptions = (section, formatText, defaultAutoFormat) => {
@@ -1168,26 +1145,30 @@ function createFormatter(config) {
   const createSection = (section, formatText, defaultAutoFormat, tableDefinitions, index) => {
     const fragment = document.createDocumentFragment();
 
-    const header = createHeader(section, formatText, defaultAutoFormat);
-    header.classList.add('combo-section__header');
+    const headerContent = createHeader(section, formatText, defaultAutoFormat);
 
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'combo-section__trigger';
+    const header = document.createElement('h2');
+    header.className = 'citizen-section-heading combo-section__header';
 
-    while (header.firstChild) {
-      trigger.appendChild(header.firstChild);
+    const indicator = document.createElement('span');
+    indicator.className = 'citizen-section-indicator citizen-ui-icon mw-ui-icon-wikimedia-collapse';
+    indicator.setAttribute('aria-hidden', 'true');
+    header.appendChild(indicator);
+
+    while (headerContent.firstChild) {
+      header.appendChild(headerContent.firstChild);
     }
-    header.appendChild(trigger);
 
     const baseId =
       (section && (section.headline_id || section.anchor)) || `combo-section-${index}`;
     const contentId = `${String(baseId).replace(/\s+/g, '-')}-content`;
-    trigger.setAttribute('aria-controls', contentId);
-    trigger.setAttribute('aria-expanded', 'true');
+    header.setAttribute('aria-controls', contentId);
+    header.setAttribute('aria-expanded', 'true');
+    header.setAttribute('role', 'button');
+    header.tabIndex = 0;
 
-    const content = document.createElement('div');
-    content.className = 'combo-section__content';
+    const content = document.createElement('section');
+    content.className = 'citizen-section combo-section__content';
     content.id = contentId;
 
     const descriptions = createDescriptions(section, formatText, defaultAutoFormat);
@@ -1203,22 +1184,36 @@ function createFormatter(config) {
     const setCollapsed = (collapsed) => {
       if (collapsed) {
         content.setAttribute('hidden', '');
-        trigger.setAttribute('aria-expanded', 'false');
-        trigger.classList.add('combo-section__trigger--collapsed');
+        header.setAttribute('aria-expanded', 'false');
+        header.classList.add('combo-section__header--collapsed');
+        header.classList.add('citizen-section-heading--collapsed');
+        indicator.classList.remove('mw-ui-icon-wikimedia-collapse');
+        indicator.classList.add('mw-ui-icon-wikimedia-expand');
       } else {
         content.removeAttribute('hidden');
-        trigger.setAttribute('aria-expanded', 'true');
-        trigger.classList.remove('combo-section__trigger--collapsed');
+        header.setAttribute('aria-expanded', 'true');
+        header.classList.remove('combo-section__header--collapsed');
+        header.classList.remove('citizen-section-heading--collapsed');
+        indicator.classList.remove('mw-ui-icon-wikimedia-expand');
+        indicator.classList.add('mw-ui-icon-wikimedia-collapse');
       }
     };
 
     const toggleCollapsed = () => {
-      const isCollapsed = trigger.getAttribute('aria-expanded') === 'false';
+      const isCollapsed = header.getAttribute('aria-expanded') === 'false';
       setCollapsed(!isCollapsed);
     };
 
-    trigger.addEventListener('click', toggleCollapsed);
-    trigger.addEventListener('keydown', (event) => {
+    header.addEventListener('click', (event) => {
+      if (event.target.closest('a')) {
+        return;
+      }
+      toggleCollapsed();
+    });
+    header.addEventListener('keydown', (event) => {
+      if (event.target !== header) {
+        return;
+      }
       if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
         event.preventDefault();
         toggleCollapsed();
