@@ -136,8 +136,9 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading {
-  margin-top: 6rem !important;
-  margin-bottom: 3.5rem !important;
+  margin-top: 3rem !important;
+  margin-bottom: 1rem !important;
+  padding-left: 0.25rem;
 }
 
 .citizen-section-heading:first-of-type {
@@ -145,7 +146,7 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading--collapsed {
-  margin-bottom: 6rem !important;
+  margin-bottom: 1rem !important;
 }
 
 .citizen-section-heading .citizen-section-indicator {
@@ -154,47 +155,58 @@ function createFormatter(config) {
   justify-content: center;
   width: 1.25em;
   margin-right: 0.5em;
-  font-size: 0.95em;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.section-spacing,
+.combo-section__spacer {
+  height: 1.75rem;
+  width: 100%;
 }
 
 .citizen-section-heading + .citizen-section {
   box-sizing: border-box;
   padding-left: 3.25rem !important;
-  margin-bottom: 6rem !important;
+  margin-bottom: 0 !important;
 }
 
 .combo-section__header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 2.25rem 0 0.5rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-left: 2.5rem !important;
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-left: 1.75rem !important;
 }
 
 .combo-section__header--collapsed {
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .citizen-section-heading + .citizen-section .combo-section__header:first-child {
-  margin-top: 0;
+  margin-top: 0.5rem;
 }
 
 .combo-section__indicator {
-  font-size: 0.85em;
+  font-size: 0.95em;
   line-height: 1;
   min-width: 1em;
   text-align: center;
 }
 
 .combo-section__content {
-  margin-left: 2.5rem !important;
-  margin-bottom: 3.5rem;
+  margin-left: 3rem !important;
+  margin-bottom: 1.5rem;
 }
 
 .combo-section__content[hidden] {
   display: none !important;
+}
+
+.combo-section__content h4 {
+  margin-left: 1.5rem;
 }
 
 .combo-section__header:focus-visible,
@@ -229,10 +241,8 @@ function createFormatter(config) {
       heading.insertBefore(indicator, heading.firstChild);
     }
 
-    indicator.classList.add('citizen-section-indicator', 'citizen-ui-icon', 'mw-ui-icon');
+    indicator.className = 'citizen-section-indicator';
     indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '';
-    indicator.classList.remove('mw-ui-icon-wikimedia-collapse', 'mw-ui-icon-wikimedia-expand');
 
     const indicatorElement = indicator;
 
@@ -257,8 +267,7 @@ function createFormatter(config) {
       : null;
 
     const updateIndicator = (collapsed) => {
-      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-expand', collapsed);
-      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-collapse', !collapsed);
+      indicatorElement.textContent = collapsed ? '↑' : '↓';
     };
 
     const setCollapsed = (collapsed) => {
@@ -1385,6 +1394,12 @@ function createFormatter(config) {
 
     fragment.appendChild(header);
     fragment.appendChild(content);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'combo-section__spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.style.height = '1.75rem';
+    fragment.appendChild(spacer);
     return fragment;
   };
 
