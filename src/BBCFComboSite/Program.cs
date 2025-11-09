@@ -4,25 +4,28 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.IO;
 
-var builder = WebApplication.CreateBuilder(args);
+var initialContentRoot = Directory.GetCurrentDirectory();
+var repoRoot = FindRepositoryRoot(initialContentRoot);
 
-var repoRoot = FindRepositoryRoot(builder.Environment.ContentRootPath);
-var referenceRoot = FindReferenceRoot(repoRoot, builder.Environment.ContentRootPath);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = repoRoot,
+    WebRootPath = repoRoot
+});
 
-var webRoot = repoRoot;
+var referenceRoot = FindReferenceRoot(repoRoot, initialContentRoot);
 
-builder.Host.UseContentRoot(repoRoot);
-builder.WebHost.UseWebRoot(webRoot);
-builder.Environment.WebRootPath = webRoot;
+var webRoot = builder.Environment.WebRootPath;
 
 var app = builder.Build();
 
 app.Logger.LogInformation("Serving static files from {WebRoot}", webRoot);
-if (!string.Equals(webRoot, builder.Environment.ContentRootPath, StringComparison.Ordinal))
+if (!string.Equals(webRoot, initialContentRoot, StringComparison.Ordinal))
 {
     app.Logger.LogDebug(
-        "Content root is {ContentRoot}; static web root adjusted to {WebRoot}",
-        builder.Environment.ContentRootPath,
+        "Initial content root was {InitialContentRoot}; static web root adjusted to {WebRoot}",
+        initialContentRoot,
         webRoot);
 }
 
