@@ -122,6 +122,41 @@ function createFormatter(config) {
     return;
   }
 
+  const ensureStyles = () => {
+    if (document.getElementById('combo-section-styles')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'combo-section-styles';
+    style.textContent = `
+.combo-section__header {
+  cursor: pointer;
+}
+
+.combo-section__header:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.combo-section__header::after {
+  content: '\\25BC';
+  font-size: 0.75em;
+  margin-left: 0.5rem;
+}
+
+.combo-section__header.combo-section__header--collapsed::after {
+  content: '\\25B6';
+}
+`;
+
+    if (document.head) {
+      document.head.appendChild(style);
+    }
+  };
+
+  ensureStyles();
+
   const source = root.dataset.source || 'combo-sections.json';
   const formattingSource = root.dataset.formattingRules || 'combo-formatting-rules.json';
   const tableDefinitionsSource = root.dataset.tableDefinitions || 'combo-table-definitions.json';
@@ -1112,6 +1147,67 @@ function createFormatter(config) {
     return table;
   };
 
+  const createSection = (section, formatText, defaultAutoFormat, tableDefinitions, index) => {
+    const fragment = document.createDocumentFragment();
+
+    const header = createHeader(section, formatText, defaultAutoFormat);
+    header.classList.add('combo-section__header');
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+
+    const baseId =
+      (section && (section.headline_id || section.anchor)) || `combo-section-${index}`;
+    const contentId = `${String(baseId).replace(/\s+/g, '-')}-content`;
+    header.setAttribute('aria-controls', contentId);
+    header.setAttribute('aria-expanded', 'true');
+
+    const content = document.createElement('div');
+    content.className = 'combo-section__content';
+    content.id = contentId;
+
+    const descriptions = createDescriptions(section, formatText, defaultAutoFormat);
+    if (descriptions && descriptions.childNodes && descriptions.childNodes.length) {
+      content.appendChild(descriptions);
+    }
+
+    const table = createTable(section, formatText, defaultAutoFormat, tableDefinitions);
+    if (table) {
+      content.appendChild(table);
+    }
+
+    const setCollapsed = (collapsed) => {
+      if (collapsed) {
+        content.setAttribute('hidden', '');
+        header.setAttribute('aria-expanded', 'false');
+        header.classList.add('combo-section__header--collapsed');
+      } else {
+        content.removeAttribute('hidden');
+        header.setAttribute('aria-expanded', 'true');
+        header.classList.remove('combo-section__header--collapsed');
+      }
+    };
+
+    const toggleCollapsed = () => {
+      const isCollapsed = header.getAttribute('aria-expanded') === 'false';
+      setCollapsed(!isCollapsed);
+    };
+
+    header.addEventListener('click', toggleCollapsed);
+    header.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+        event.preventDefault();
+        toggleCollapsed();
+      }
+    });
+
+    setCollapsed(false);
+
+    fragment.appendChild(header);
+    fragment.appendChild(content);
+
+    return fragment;
+  };
+
   const initialiseTableSorter = () => {
     try {
       if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.tablesorter === 'function') {
@@ -1141,13 +1237,13 @@ function createFormatter(config) {
 
       root.innerHTML = '';
       const fragment = document.createDocumentFragment();
-      sections.forEach((section) => {
+      sections.forEach((section, index) => {
         const defaultAutoFormat = !(
           section && (section.auto_format === false || section.auto_format === 'none')
         );
-        fragment.appendChild(createHeader(section, formatText, defaultAutoFormat));
-        fragment.appendChild(createDescriptions(section, formatText, defaultAutoFormat));
-        fragment.appendChild(createTable(section, formatText, defaultAutoFormat, resolvedDefinitions));
+        fragment.appendChild(
+          createSection(section, formatText, defaultAutoFormat, resolvedDefinitions, index)
+        );
       });
       root.appendChild(fragment);
       initialiseTableSorter();
