@@ -354,6 +354,225 @@ function createFormatter(config) {
     }
   };
 
+  const getInitialSortOrder = (columnConfig) => {
+    if (!columnConfig || !columnConfig.sort || !columnConfig.sort.initialOrder) {
+      return 'asc';
+    }
+
+    const order = String(columnConfig.sort.initialOrder).toLowerCase();
+    return order === 'desc' ? 'desc' : 'asc';
+  };
+
+  const getCellSortValue = (cell, columnConfig, type) => {
+    if (!cell) {
+      return null;
+    }
+
+    const sortConfig = columnConfig && columnConfig.sort;
+    const resolvedType = type || (sortConfig && sortConfig.type) || 'text';
+    const attributeValue = cell.getAttribute('data-sort-value');
+
+    if (attributeValue != null) {
+      if (resolvedType === 'number') {
+        const number = Number(attributeValue);
+        return Number.isNaN(number) ? null : number;
+      }
+      return attributeValue;
+    }
+
+    const text = cell.textContent != null ? cell.textContent.trim() : '';
+
+    if (!text) {
+      return null;
+    }
+
+    if (resolvedType === 'number') {
+      const match = text.match(/-?\d+(?:\.\d+)?/);
+      if (!match) {
+        return null;
+      }
+      const number = Number(match[0]);
+      return Number.isNaN(number) ? null : number;
+    }
+
+    return text;
+  };
+
+  const collator =
+    typeof Intl !== 'undefined' && typeof Intl.Collator === 'function'
+      ? new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+      : null;
+
+  const compareSortValues = (left, right, type) => {
+    if (left == null && right == null) {
+      return 0;
+    }
+
+    if (left == null) {
+      return 1;
+    }
+
+    if (right == null) {
+      return -1;
+    }
+
+    if (type === 'number') {
+      const leftNumber = typeof left === 'number' ? left : Number(left);
+      const rightNumber = typeof right === 'number' ? right : Number(right);
+
+      const leftIsNaN = Number.isNaN(leftNumber);
+      const rightIsNaN = Number.isNaN(rightNumber);
+
+      if (leftIsNaN && rightIsNaN) {
+        return 0;
+      }
+
+      if (leftIsNaN) {
+        return 1;
+      }
+
+      if (rightIsNaN) {
+        return -1;
+      }
+
+      if (leftNumber < rightNumber) {
+        return -1;
+      }
+
+      if (leftNumber > rightNumber) {
+        return 1;
+      }
+
+      return 0;
+    }
+
+    const leftText = typeof left === 'string' ? left : String(left);
+    const rightText = typeof right === 'string' ? right : String(right);
+
+    if (collator) {
+      return collator.compare(leftText, rightText);
+    }
+
+    return leftText.localeCompare(rightText);
+  };
+
+  const enableNativeTableSorting = (table, columnConfigs) => {
+    if (!table || !table.tBodies || !table.tBodies.length) {
+      return;
+    }
+
+    const tbody = table.tBodies[0];
+    const headerRow = table.tHead && table.tHead.rows && table.tHead.rows[0];
+    if (!tbody || !headerRow) {
+      return;
+    }
+
+    const headers = Array.from(headerRow.cells);
+    if (!headers.length) {
+      return;
+    }
+
+    const state = { columnIndex: null, order: 'asc' };
+
+    const applySort = (columnIndex, order) => {
+      const columnConfig = columnConfigs[columnIndex] || {};
+      const sortConfig = columnConfig.sort || {};
+      const type = sortConfig.type || 'text';
+
+      const rowsWithValues = Array.from(tbody.rows).map((row, index) => {
+        const cell = row.cells[columnIndex];
+        return {
+          row,
+          index,
+          value: getCellSortValue(cell, columnConfig, type),
+        };
+      });
+
+      rowsWithValues.sort((left, right) => {
+        const comparison = compareSortValues(left.value, right.value, type);
+        if (comparison !== 0) {
+          return order === 'desc' ? -comparison : comparison;
+        }
+        return left.index - right.index;
+      });
+
+      const fragment = document.createDocumentFragment();
+      rowsWithValues.forEach(({ row }) => fragment.appendChild(row));
+      tbody.appendChild(fragment);
+
+      headers.forEach((header, index) => {
+        const config = columnConfigs[index] || {};
+        header.classList.remove('headerSortUp', 'headerSortDown');
+        header.dataset.sortOrder = '';
+
+        if (config.sortDisabled) {
+          header.removeAttribute('aria-sort');
+          header.removeAttribute('title');
+          return;
+        }
+
+        header.setAttribute('aria-sort', 'none');
+        header.setAttribute('title', 'Sort ascending');
+      });
+
+      const activeHeader = headers[columnIndex];
+      if (activeHeader) {
+        const ascending = order === 'asc';
+        activeHeader.classList.add(ascending ? 'headerSortUp' : 'headerSortDown');
+        activeHeader.setAttribute('aria-sort', ascending ? 'ascending' : 'descending');
+        activeHeader.dataset.sortOrder = order;
+        activeHeader.setAttribute('title', ascending ? 'Sort descending' : 'Sort ascending');
+      }
+    };
+
+    const triggerSort = (columnIndex) => {
+      const columnConfig = columnConfigs[columnIndex] || {};
+      if (columnConfig.sortDisabled) {
+        return;
+      }
+
+      const initialOrder = getInitialSortOrder(columnConfig);
+      const order =
+        state.columnIndex === columnIndex
+          ? state.order === 'asc'
+            ? 'desc'
+            : 'asc'
+          : initialOrder;
+
+      state.columnIndex = columnIndex;
+      state.order = order;
+      applySort(columnIndex, order);
+    };
+
+    headers.forEach((header, index) => {
+      const columnConfig = columnConfigs[index] || {};
+      if (columnConfig.sortDisabled) {
+        header.removeAttribute('tabindex');
+        header.removeAttribute('role');
+        header.removeAttribute('title');
+        return;
+      }
+
+      const sortConfig = columnConfig.sort;
+      if (!sortConfig || !sortConfig.type) {
+        columnConfig.sort = Object.assign({}, columnConfig.sort || {}, { type: 'text' });
+      }
+
+      header.setAttribute('aria-sort', 'none');
+      header.dataset.sortOrder = '';
+      header.addEventListener('click', (event) => {
+        event.preventDefault();
+        triggerSort(index);
+      });
+      header.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          triggerSort(index);
+        }
+      });
+    });
+  };
+
   const normaliseSortConfig = (column) => {
     if (!column || typeof column !== 'object') {
       return null;
@@ -745,6 +964,7 @@ function createFormatter(config) {
         valueColor: null,
         header: null,
         sort: null,
+        sortDisabled: false,
       };
 
       if (tableConfig.columnsHtml) {
@@ -801,6 +1021,11 @@ function createFormatter(config) {
           const sortConfig = normaliseSortConfig(column);
           if (sortConfig) {
             columnConfig.sort = sortConfig;
+          } else if (
+            column &&
+            (column.sort === false || column.sortConfig === false || column.sorter === false)
+          ) {
+            columnConfig.sortDisabled = true;
           }
         } else {
           html = normaliseCell(column, formatText, defaultAutoFormat);
@@ -879,6 +1104,10 @@ function createFormatter(config) {
     table.appendChild(tbody);
 
     table.appendChild(document.createElement('tfoot'));
+
+    if (!(window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.tablesorter === 'function')) {
+      enableNativeTableSorting(table, columnConfigs);
+    }
 
     return table;
   };
