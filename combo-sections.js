@@ -136,7 +136,7 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading {
-  margin-top: 5rem !important;
+  margin-top: 6rem !important;
   margin-bottom: 3.5rem !important;
 }
 
@@ -145,7 +145,7 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading--collapsed {
-  margin-bottom: 5rem !important;
+  margin-bottom: 6rem !important;
 }
 
 .citizen-section-heading .citizen-section-indicator {
@@ -153,27 +153,28 @@ function createFormatter(config) {
   align-items: center;
   justify-content: center;
   width: 1.25em;
-  margin-right: 0.35em;
-  font-size: 0.9em;
+  margin-right: 0.5em;
+  font-size: 0.95em;
 }
 
 .citizen-section-heading + .citizen-section {
   box-sizing: border-box;
-  padding-left: 3rem !important;
+  padding-left: 3.25rem !important;
+  margin-bottom: 6rem !important;
 }
 
 .combo-section__header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 1.75rem 0 0.75rem;
-  font-size: 1.25rem;
+  margin: 2.25rem 0 0.5rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  margin-left: 1.5rem;
+  margin-left: 2.5rem !important;
 }
 
 .combo-section__header--collapsed {
-  margin-bottom: 1.75rem;
+  margin-bottom: 2rem;
 }
 
 .citizen-section-heading + .citizen-section .combo-section__header:first-child {
@@ -181,15 +182,15 @@ function createFormatter(config) {
 }
 
 .combo-section__indicator {
-  font-size: 0.9em;
+  font-size: 0.85em;
   line-height: 1;
   min-width: 1em;
   text-align: center;
 }
 
 .combo-section__content {
-  margin-left: 1.5rem;
-  margin-bottom: 3rem;
+  margin-left: 2.5rem !important;
+  margin-bottom: 3.5rem;
 }
 
 .combo-section__content[hidden] {
@@ -225,23 +226,13 @@ function createFormatter(config) {
     let indicator = heading.querySelector('.citizen-section-indicator');
     if (!indicator) {
       indicator = document.createElement('span');
-      indicator.className = 'citizen-section-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.textContent = '▼';
       heading.insertBefore(indicator, heading.firstChild);
-    } else {
-      indicator.classList.remove(
-        'citizen-ui-icon',
-        'mw-ui-icon',
-        'mw-ui-icon-wikimedia-collapse',
-        'mw-ui-icon-wikimedia-expand',
-      );
-      indicator.classList.add('citizen-section-indicator');
-      indicator.setAttribute('aria-hidden', 'true');
-      if (!indicator.textContent || !indicator.textContent.trim()) {
-        indicator.textContent = '▼';
-      }
     }
+
+    indicator.classList.add('citizen-section-indicator', 'citizen-ui-icon', 'mw-ui-icon');
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.textContent = '';
+    indicator.classList.remove('mw-ui-icon-wikimedia-collapse', 'mw-ui-icon-wikimedia-expand');
 
     const indicatorElement = indicator;
 
@@ -266,7 +257,8 @@ function createFormatter(config) {
       : null;
 
     const updateIndicator = (collapsed) => {
-      indicatorElement.textContent = collapsed ? '▲' : '▼';
+      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-expand', collapsed);
+      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-collapse', !collapsed);
     };
 
     const setCollapsed = (collapsed) => {
@@ -1328,7 +1320,7 @@ function createFormatter(config) {
     const indicator = document.createElement('span');
     indicator.className = 'combo-section__indicator';
     indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '▼';
+    indicator.textContent = '↓';
     header.insertBefore(indicator, header.firstChild);
 
     const baseId =
@@ -1355,12 +1347,12 @@ function createFormatter(config) {
 
     const setCollapsed = (collapsed) => {
       if (collapsed) {
-        indicator.textContent = '▲';
+        indicator.textContent = '↑';
         content.setAttribute('hidden', '');
         header.setAttribute('aria-expanded', 'false');
         header.classList.add('combo-section__header--collapsed');
       } else {
-        indicator.textContent = '▼';
+        indicator.textContent = '↓';
         content.removeAttribute('hidden');
         header.setAttribute('aria-expanded', 'true');
         header.classList.remove('combo-section__header--collapsed');
