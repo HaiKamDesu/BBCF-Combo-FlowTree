@@ -136,8 +136,9 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading {
-  margin-top: 6rem !important;
-  margin-bottom: 3.5rem !important;
+  margin-top: 3rem !important;
+  margin-bottom: 1rem !important;
+  padding-left: 0.25rem;
 }
 
 .citizen-section-heading:first-of-type {
@@ -145,7 +146,7 @@ function createFormatter(config) {
 }
 
 .citizen-section-heading--collapsed {
-  margin-bottom: 6rem !important;
+  margin-bottom: 1rem !important;
 }
 
 .citizen-section-heading .citizen-section-indicator {
@@ -154,47 +155,65 @@ function createFormatter(config) {
   justify-content: center;
   width: 1.25em;
   margin-right: 0.5em;
-  font-size: 0.95em;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.section-spacing {
+  height: 1.75rem;
+  width: 100%;
+}
+
+.combo-section__spacer {
+  height: 0.875rem;
+  width: 100%;
 }
 
 .citizen-section-heading + .citizen-section {
   box-sizing: border-box;
   padding-left: 3.25rem !important;
-  margin-bottom: 6rem !important;
+  margin-bottom: 0 !important;
 }
 
 .combo-section__header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 2.25rem 0 0.5rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-left: 2.5rem !important;
+  margin: 0.875rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-left: 1.75rem !important;
 }
 
 .combo-section__header--collapsed {
-  margin-bottom: 2rem;
+  margin-bottom: 0.875rem;
 }
 
 .citizen-section-heading + .citizen-section .combo-section__header:first-child {
-  margin-top: 0;
+  margin-top: 0.5rem;
 }
 
 .combo-section__indicator {
-  font-size: 0.85em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95em;
   line-height: 1;
-  min-width: 1em;
-  text-align: center;
+  min-width: 1.25em;
+  width: 1.25em;
 }
 
 .combo-section__content {
-  margin-left: 2.5rem !important;
-  margin-bottom: 3.5rem;
+  margin-left: 3rem !important;
+  margin-bottom: 1.5rem;
 }
 
 .combo-section__content[hidden] {
   display: none !important;
+}
+
+.combo-section__content h4 {
+  margin-left: 1.5rem;
 }
 
 .combo-section__header:focus-visible,
@@ -210,6 +229,16 @@ function createFormatter(config) {
   };
 
   const CITIZEN_TOGGLE_DATA_KEY = 'citizenToggleInitialised';
+
+  const applyIndicatorState = (indicator, collapsed) => {
+    if (!indicator) {
+      return;
+    }
+    indicator.textContent = '';
+    indicator.classList.add('citizen-ui-icon', 'mw-ui-icon', 'mw-ui-icon-element');
+    indicator.classList.toggle('mw-ui-icon-wikimedia-expand', collapsed);
+    indicator.classList.toggle('mw-ui-icon-wikimedia-collapse', !collapsed);
+  };
 
   const initialiseCitizenSectionHeading = (heading) => {
     if (!heading || heading.dataset[CITIZEN_TOGGLE_DATA_KEY] === 'true') {
@@ -229,10 +258,8 @@ function createFormatter(config) {
       heading.insertBefore(indicator, heading.firstChild);
     }
 
-    indicator.classList.add('citizen-section-indicator', 'citizen-ui-icon', 'mw-ui-icon');
+    indicator.className = 'citizen-section-indicator';
     indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '';
-    indicator.classList.remove('mw-ui-icon-wikimedia-collapse', 'mw-ui-icon-wikimedia-expand');
 
     const indicatorElement = indicator;
 
@@ -257,8 +284,7 @@ function createFormatter(config) {
       : null;
 
     const updateIndicator = (collapsed) => {
-      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-expand', collapsed);
-      indicatorElement.classList.toggle('mw-ui-icon-wikimedia-collapse', !collapsed);
+      applyIndicatorState(indicatorElement, collapsed);
     };
 
     const setCollapsed = (collapsed) => {
@@ -1320,7 +1346,6 @@ function createFormatter(config) {
     const indicator = document.createElement('span');
     indicator.className = 'combo-section__indicator';
     indicator.setAttribute('aria-hidden', 'true');
-    indicator.textContent = '↓';
     header.insertBefore(indicator, header.firstChild);
 
     const baseId =
@@ -1347,16 +1372,15 @@ function createFormatter(config) {
 
     const setCollapsed = (collapsed) => {
       if (collapsed) {
-        indicator.textContent = '↑';
         content.setAttribute('hidden', '');
         header.setAttribute('aria-expanded', 'false');
         header.classList.add('combo-section__header--collapsed');
       } else {
-        indicator.textContent = '↓';
         content.removeAttribute('hidden');
         header.setAttribute('aria-expanded', 'true');
         header.classList.remove('combo-section__header--collapsed');
       }
+      applyIndicatorState(indicator, collapsed);
     };
 
     const toggleCollapsed = () => {
@@ -1385,6 +1409,12 @@ function createFormatter(config) {
 
     fragment.appendChild(header);
     fragment.appendChild(content);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'combo-section__spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.style.height = '0.875rem';
+    fragment.appendChild(spacer);
     return fragment;
   };
 
