@@ -116,65 +116,6 @@ function createFormatter(config) {
   };
 }
 
-const DEFAULT_NEUTRAL_TEXT_COLOR = '#ffffff';
-
-function enforceNeutralSlashColor(element, neutralColor = DEFAULT_NEUTRAL_TEXT_COLOR) {
-  if (
-    !element ||
-    !element.childNodes ||
-    typeof document === 'undefined' ||
-    !document.createTreeWalker ||
-    typeof NodeFilter === 'undefined'
-  ) {
-    return;
-  }
-
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  const replacements = [];
-
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    const value = node && node.nodeValue;
-
-    if (!value || value.indexOf('/') === -1) {
-      continue;
-    }
-
-    const parts = value.split('/');
-    const fragment = document.createDocumentFragment();
-
-    parts.forEach((part, index) => {
-      if (part) {
-        fragment.appendChild(document.createTextNode(part));
-      }
-
-      if (index < parts.length - 1) {
-        const slash = document.createElement('span');
-        slash.textContent = '/';
-        slash.style.color = neutralColor;
-        fragment.appendChild(slash);
-      }
-    });
-
-    replacements.push({ node, fragment });
-  }
-
-  replacements.forEach(({ node, fragment }) => {
-    if (node.parentNode) {
-      node.parentNode.replaceChild(fragment, node);
-    }
-  });
-}
-
-function applyColumnTextColor(cell, color) {
-  if (!cell || !color) {
-    return;
-  }
-
-  cell.style.color = color;
-  enforceNeutralSlashColor(cell);
-}
-
 (function () {
   const root = document.getElementById('combo-sections-root');
   if (!root) {
@@ -360,6 +301,10 @@ function applyColumnTextColor(cell, color) {
       }
 
       th.innerHTML = html;
+      const columnConfig = columnConfigs[columnConfigs.length - 1];
+      if (columnConfig && columnConfig.textColor) {
+        th.style.color = columnConfig.textColor;
+      }
       headerRow.appendChild(th);
     });
 
@@ -381,7 +326,7 @@ function applyColumnTextColor(cell, color) {
           cell.innerHTML = cellHtml || '';
           const columnConfig = columnConfigs[columnIndex] || {};
           if (columnConfig.textColor) {
-            applyColumnTextColor(cell, columnConfig.textColor);
+            cell.style.color = columnConfig.textColor;
           }
           tr.appendChild(cell);
         });
@@ -393,7 +338,7 @@ function applyColumnTextColor(cell, color) {
             columnConfig.autoFormat !== undefined ? columnConfig.autoFormat : defaultAutoFormat;
           cell.innerHTML = normaliseCell(cellValue, formatText, columnAutoFormat);
           if (columnConfig.textColor) {
-            applyColumnTextColor(cell, columnConfig.textColor);
+            cell.style.color = columnConfig.textColor;
           }
           tr.appendChild(cell);
         });
