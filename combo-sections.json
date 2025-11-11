@@ -16,8 +16,128 @@
         "Optimal Crossup Superball Combo",
         {
           "html": ""
-        }
+        },
+        "6B > 5C"
       ]
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_6B5C",
+    "headline_id": "Followups_6B5C",
+    "title": {
+      "text": "Followups (6B > 5C Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 6B > 5C Ender is a versatile tool that she will almost always use out of most of her combos both midscreen and in corner. There are various ways to both alter the ending to turn it into another ender, or use the free time to set up your traps to put pressure on the map.",
+      "",
+      "Kokonoe can alter this ender on almost all combos into one of the following options",
+      "6B > 5C > 214X (Damage route)",
+      "6B > 5C > 22B (Corner catch-all)",
+      "6B > 5C > 3C(1) (Corner gimmick/midscreen ender)",
+      "6B > 5C > 6D / 4D (Midscreen setup tempo)"
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5C22B",
+    "headline_id": "Followups_5C22B",
+    "title": {
+      "text": "Followups (5C > 22B Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > 22B ender is one of her options out of her 5C enders. This is kokonoe's default catch-all corner ender, as it can catch rolls, delay techs, and forces opponent to block on wakeup for at least one mixup.",
+      "When setting 22B, if you are trying to catch rolls and delay tech, your optimal OTG button is 2C.",
+      "However, a delay 2B after 22B does fine as well, and can give you a bit more time to see what they're doing before deciding on anything."
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5C214X",
+    "headline_id": "Followups_5C214X",
+    "title": {
+      "text": "Followups (5C > 214X Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > 214X ender is a scary option that you can use to put pressure on the map by giving up some of your oki capabilities.",
+      "Usually, the gameplan with this ender is to set your fireball, and then either pressure opponent until fireball is able to drop down without a graviton (corner only), or simply attempt to direct the fireball with a graviton placement right on their wakeup (this is good against characters like nine and arakune, who need to be consistently meaty'd to make them unable to TP out.)"
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5CXD",
+    "headline_id": "Followups_5CXD",
+    "title": {
+      "text": "Followups (5C > xD Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > xD ender is a risky tool that is used to quickly and safely set-up for moves that require a cover-up such as Kokonoe's j.2C. However, this is risky, as you are giving up your two other more direct approaches for the possibility of hitting a big combo off j.2C.",
+      "In midscreen, your opponent will be thrown far away and you can decide to play it safe by doing 5C > 6D > 214A, however, this is just an inferior version of 214A > 6D, since they can run under your fireball.",
+      "In corner, you can set graviton and meaty your opponent so they can keep guessing when exactly you'll go for j.2C, however, this is an inferior version of 5C > 22B, as you are giving up some potential as far as catching every wakeup type.",
+      "Given all of this, this is a setup that is mostly done to vary your options, and when you are properly able to get the j.2C overhead off, it will feel pretty good. Keep varying your options and enders, and you'll confuse your opponent enough that they won't know what's coming next."
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5C3C1",
+    "headline_id": "Followups_5C3C1",
+    "title": {
+      "text": "Followups (5C > 3C(1) Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > 3C(1) is a spinoff off her normal 5C endings, being basically the same as far as what you'll do after it, except it has a few more tricks up its sleeve. The problem is, they come with a few other downsides.",
+      "Usually, this ender is mostly used midscreen in combination with 214X. But depending",
+      "",
+      "Kokonoe can alter this ender on almost all combos into one of the following options",
+      "5C > 3C(1) > 214X (Pressure route / Most used midscreen ender)",
+      "5C > 3C(1) > 22B (Corner gimmick)",
+      "5C > 3C(1) > 6D / 4D (Setup tempo)"
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5C3C1214X",
+    "headline_id": "Followups_5C3C1214X",
+    "title": {
+      "text": "Followups (5C > 3C(1) > 214X Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > 3C(1) > 214X ender is her default midscreen ender by excellence, it allows for both some specific-to-this-situation followups, and to keep pressuring your opponent midscreen.",
+      "Midscreen, with 214X on the field after pulling your opponent in with 3C(1), Kokonoe can meaty the opponent on wakeup, stalling for the fireball to come back down, and even being able to do a quick setup on blockstring for a fireball crossup.",
+      "In corner, this ender doesnt make as much sense to do over 5C > 22B and 3C(1) > 22B, but could serve you as a looming threat to condition opponent to respect you a bit more."
+    ],
+    "rows": [
+    ],
+    "table": "standard"
+  },
+  {
+    "anchor": "Followups_5C3C122B",
+    "headline_id": "Followups_5C3C122B",
+    "title": {
+      "text": "Followups (5C > 3C(1) > 22B Ender)",
+      "wrap": "b"
+    },
+    "descriptions": [
+      "Kokonoe's 5C > 3C(1) > 22B ender is a gimmick. There is really no other way of putting it.",
+      ""
+    ],
+    "rows": [
     ],
     "table": "standard"
   },
@@ -156,7 +276,7 @@
       "text": "Meterless Routes TESTING TESTING (3C/6C/j2C)",
       "wrap": "b"
     },
-    "descriptions": ["This is a test"],
+    "descriptions": [ "This is a test" ],
     "rows": [
       [
         "3C > 236[A] > 5A > 5B > 6A > jB(2) > j2C > j2D > j236D > 6B > 5C > 3C(1) > 236A",
