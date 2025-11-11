@@ -63,29 +63,10 @@
     "headlineId": "Combo_Bible",
     "sectionId": "citizen-section-combo-bible",
     "content": {
-      "mode": "group",
-      "sections": [
-        {
-          "title": "Combo List",
-          "headlineId": "Combo_List",
-          "sectionId": "section-combo-list",
-          "content": {
-            "mode": "combo-list",
-            "rootId": "combo-sections-root",
-            "source": "combo-sections.json",
-            "tableDefinitions": "combo-table-definitions.json"
-          }
-        },
-        {
-          "title": "Golden Tager",
-          "headlineId": "Golden_Tager_Combos",
-          "sectionId": "section-golden-tager",
-          "content": {
-            "mode": "html-fragment",
-            "source": "sections/golden-tager-combos.html"
-          }
-        }
-      ]
+      "mode": "combo-list",
+      "rootId": "combo-sections-root",
+      "source": "combo-sections.json",
+      "tableDefinitions": "combo-table-definitions.json"
     }
   },
   {

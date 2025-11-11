@@ -225,20 +225,23 @@
     const style = document.createElement('style');
     style.id = 'page-section-styles';
     style.textContent = `
+.citizen-subsection {
+  box-sizing: border-box;
+  margin-left: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
 .citizen-subsection-heading {
-  margin-top: 2rem !important;
-  margin-bottom: 0.75rem !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.5rem !important;
   padding-left: 0.25rem;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
 }
 
 .citizen-subsection-heading:first-child {
   margin-top: 0 !important;
 }
 
-.citizen-subsection-heading .citizen-section-indicator {
-  display: none;
-}
 `;
 
     document.head.appendChild(style);
@@ -311,6 +314,12 @@
     if (config.headingAttributes) {
       applyAttributes(heading, config.headingAttributes);
     }
+
+    const indicator = document.createElement('span');
+    indicator.className =
+      'citizen-section-indicator citizen-ui-icon mw-ui-icon mw-ui-icon-element mw-ui-icon-wikimedia-collapse';
+    indicator.setAttribute('aria-hidden', 'true');
+    heading.appendChild(indicator);
 
     const headline = document.createElement('span');
     headline.className = 'mw-headline';
@@ -419,7 +428,20 @@
           wrapper.appendChild(heading);
         }
 
-        const childCombos = await renderSectionContent(wrapper, child, options);
+        let contentContainer = wrapper;
+        if (heading) {
+          contentContainer = document.createElement(child.contentContainerTag || 'div');
+          contentContainer.className = child.contentContainerClass || 'citizen-subsection__content';
+          if (child.contentContainerId) {
+            contentContainer.id = child.contentContainerId;
+          }
+          if (child.contentContainerAttributes) {
+            applyAttributes(contentContainer, child.contentContainerAttributes);
+          }
+          wrapper.appendChild(contentContainer);
+        }
+
+        const childCombos = await renderSectionContent(contentContainer, child, options);
         childCombos.forEach((comboRoot) => comboRoots.push(comboRoot));
 
         groupContainer.appendChild(wrapper);
