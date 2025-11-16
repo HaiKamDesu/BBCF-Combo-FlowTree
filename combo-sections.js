@@ -127,14 +127,13 @@ function createFormatter(config) {
   let hasInitialised = false;
   const FILTER_STATE_STORAGE_KEY = 'comboFilters.state';
   const CUSTOM_PRESETS_STORAGE_KEY = 'comboFilters.customPresets';
-  const BOOLEAN_TRUE_VALUES = ['yes', 'true', '1', '✔', '✓'];
-
   const columnRegistry = new Map();
   const sectionRegistry = new Map();
   let tableMetadataList = [];
   let tableMetadataMap = new WeakMap();
   let filterState = createDefaultFilterState();
   let customPresets = [];
+  let builtInPresets = [];
   let filterInterface = null;
   let isFilterPanelOpen = false;
   const columnUiState = new Map();
@@ -158,50 +157,6 @@ function createFormatter(config) {
       ),
     );
   }
-
-  function createBooleanCondition(values = BOOLEAN_TRUE_VALUES) {
-    return {
-      type: 'enum',
-      mode: 'include',
-      values: normaliseEnumValues(values),
-    };
-  }
-
-  const PRESET_DEFINITIONS = [
-    {
-      key: 'overdrive',
-      name: 'Overdrive Combos',
-      description: 'Show combos flagged as Overdrive only.',
-      state: () => ({
-        hideEmptySections: true,
-        columnConditions: {
-          'is-overdrive-only': createBooleanCondition(),
-        },
-      }),
-    },
-    {
-      key: 'rapid-cancel',
-      name: 'Rapid Cancel Combos',
-      description: 'Show combos that require Rapid Cancel.',
-      state: () => ({
-        hideEmptySections: true,
-        columnConditions: {
-          'has-rapid': createBooleanCondition(),
-        },
-      }),
-    },
-    {
-      key: 'odc',
-      name: 'ODC Combos',
-      description: 'Show combos that include ODC routes.',
-      state: () => ({
-        hideEmptySections: true,
-        columnConditions: {
-          'has-odc': createBooleanCondition(),
-        },
-      }),
-    },
-  ];
 
   const safeStorage = (() => {
     try {
@@ -423,6 +378,34 @@ function createFormatter(config) {
   filterState = loadFilterStateFromStorage();
   customPresets = loadCustomPresetsFromStorage();
 
+  function normalisePresetDefinitions(definitions) {
+    if (!Array.isArray(definitions)) {
+      return [];
+    }
+
+    return definitions
+      .map((definition) => {
+        if (!definition || typeof definition !== 'object') {
+          return null;
+        }
+
+        const key = definition.key && String(definition.key).trim();
+        const name = definition.name && String(definition.name).trim();
+        if (!key || !name) {
+          return null;
+        }
+
+        const description = definition.description ? String(definition.description).trim() : '';
+        return {
+          key,
+          name,
+          description,
+          state: cloneFilterState(definition.state),
+        };
+      })
+      .filter((preset) => preset && preset.key && preset.name);
+  }
+
   const textExtractionScratch = document.createElement('div');
 
   function extractTextContent(html) {
@@ -613,15 +596,16 @@ function createFormatter(config) {
     }
   }
 
-  function registerSectionMetadata(key, label, metadata = {}) {
-    if (!key) {
-      return;
-    }
-    const existing = sectionRegistry.get(key) || {
-      key,
-      label: label || key,
-      elements: new Set(),
-    };
+    function registerSectionMetadata(key, label, metadata = {}) {
+      if (!key) {
+        return;
+      }
+      const existing = sectionRegistry.get(key) || {
+        key,
+        label: label || key,
+        elements: new Set(),
+        navElements: new Set(),
+      };
     const resolvedLabel = label && String(label).trim() ? String(label).trim() : '';
     if (resolvedLabel) {
       existing.label = resolvedLabel;
@@ -649,12 +633,16 @@ function createFormatter(config) {
       existing.sectionIndex = metadata.sectionIndex;
     }
 
-    if (Array.isArray(metadata.elements)) {
-      metadata.elements.filter(Boolean).forEach((element) => existing.elements.add(element));
-    }
+      if (Array.isArray(metadata.elements)) {
+        metadata.elements.filter(Boolean).forEach((element) => existing.elements.add(element));
+      }
 
-    sectionRegistry.set(key, existing);
-  }
+      if (Array.isArray(metadata.navElements)) {
+        metadata.navElements.filter(Boolean).forEach((element) => existing.navElements.add(element));
+      }
+
+      sectionRegistry.set(key, existing);
+    }
 
   function resolveHeadingElements(heading) {
     if (!heading) {
@@ -682,6 +670,18 @@ function createFormatter(config) {
       return elements;
     }
     return [heading];
+  }
+
+  function resolveSectionNavigationElements(sectionKey) {
+    if (typeof document === 'undefined' || !sectionKey) {
+      return [];
+    }
+    const elements = [];
+    const navItem = document.getElementById(`toc-${sectionKey}`);
+    if (navItem) {
+      elements.push(navItem);
+    }
+    return elements;
   }
 
   function resolveHeadingKey(heading, fallbackIndex) {
@@ -727,18 +727,20 @@ function createFormatter(config) {
         stack.pop();
       }
       const parentKey = stack.length ? stack[stack.length - 1].key : undefined;
-      const key = resolveHeadingKey(heading, index);
-      const headline = heading.querySelector('.mw-headline');
-      const label = headline && headline.textContent ? headline.textContent.trim() : heading.textContent.trim();
-      const elements = resolveHeadingElements(heading);
-      const type = heading.classList.contains('combo-section__header') ? 'combo' : 'page';
-      registerSectionMetadata(key, label, {
-        order,
-        depth,
-        parentKey,
-        type,
-        elements,
-      });
+        const key = resolveHeadingKey(heading, index);
+        const headline = heading.querySelector('.mw-headline');
+        const label = headline && headline.textContent ? headline.textContent.trim() : heading.textContent.trim();
+        const elements = resolveHeadingElements(heading);
+        const navElements = resolveSectionNavigationElements(key);
+        const type = heading.classList.contains('combo-section__header') ? 'combo' : 'page';
+        registerSectionMetadata(key, label, {
+          order,
+          depth,
+          parentKey,
+          type,
+          elements,
+          navElements,
+        });
       stack.push({ key, level });
       order += 1;
     });
@@ -945,16 +947,20 @@ function createFormatter(config) {
   function rowMatchesConditions(rowMetadata) {
     const conditions = filterState.columnConditions || {};
     const entries = Object.entries(conditions);
-    for (let index = 0; index < entries.length; index += 1) {
-      const [columnKey, condition] = entries[index];
-      if (!condition) {
-        continue;
+      for (let index = 0; index < entries.length; index += 1) {
+        const [columnKey, condition] = entries[index];
+        if (!condition) {
+          continue;
+        }
+        const column = columnRegistry.get(columnKey);
+        if (!column || column.filterEnabled === false) {
+          continue;
+        }
+        const valueMetadata = rowMetadata && rowMetadata.values ? rowMetadata.values[columnKey] : null;
+        if (!matchesCondition(valueMetadata, condition)) {
+          return false;
+        }
       }
-      const valueMetadata = rowMetadata && rowMetadata.values ? rowMetadata.values[columnKey] : null;
-      if (!matchesCondition(valueMetadata, condition)) {
-        return false;
-      }
-    }
     return true;
   }
 
@@ -998,6 +1004,23 @@ function createFormatter(config) {
     }
   }
 
+  function sectionHasHiddenAncestor(sectionKey) {
+    if (!sectionKey) {
+      return false;
+    }
+    let current = sectionRegistry.get(sectionKey);
+    const visited = new Set();
+    while (current && current.parentKey && !visited.has(current.parentKey)) {
+      const parentKey = current.parentKey;
+      if (filterState.hiddenSections.has(parentKey)) {
+        return true;
+      }
+      visited.add(parentKey);
+      current = sectionRegistry.get(parentKey);
+    }
+    return false;
+  }
+
   function countVisibleRowsBySection() {
     const counts = new Map();
     tableMetadataList.forEach((metadata) => {
@@ -1020,20 +1043,25 @@ function createFormatter(config) {
   function updateSectionVisibility() {
     const shouldHideEmpty = Boolean(filterState.hideEmptySections);
     const visibleRowCounts = shouldHideEmpty ? countVisibleRowsBySection() : new Map();
-    sectionRegistry.forEach((entry) => {
-      const elements = entry.elements ? Array.from(entry.elements).filter(Boolean) : [];
-      if (!elements.length) {
-        return;
-      }
-      const manuallyHidden = filterState.hiddenSections.has(entry.key);
-      let hidden = manuallyHidden;
-      if (!hidden && shouldHideEmpty && entry.type === 'combo') {
-        const visibleRows = visibleRowCounts.get(entry.key) || 0;
-        hidden = visibleRows === 0;
-      }
-      elements.forEach((element) => setElementFilterHidden(element, hidden));
-    });
-  }
+      sectionRegistry.forEach((entry) => {
+        const elements = entry.elements ? Array.from(entry.elements).filter(Boolean) : [];
+        const navElements = entry.navElements ? Array.from(entry.navElements).filter(Boolean) : [];
+        if (!elements.length) {
+          if (!navElements.length) {
+            return;
+          }
+        }
+        const manuallyHidden = filterState.hiddenSections.has(entry.key);
+        const ancestorHidden = sectionHasHiddenAncestor(entry.key);
+        let hidden = manuallyHidden || ancestorHidden;
+        if (!hidden && shouldHideEmpty && entry.type === 'combo') {
+          const visibleRows = visibleRowCounts.get(entry.key) || 0;
+          hidden = visibleRows === 0;
+        }
+        const targets = elements.concat(navElements);
+        targets.forEach((element) => setElementFilterHidden(element, hidden));
+      });
+    }
 
   function applyFilters() {
     if (!tableMetadataList.length) {
@@ -1095,10 +1123,11 @@ function createFormatter(config) {
     } else {
       filterState.hiddenSections.delete(sectionKey);
     }
-    persistFilterState();
-    updateSectionVisibility();
-    updateFilterButtonState();
-  }
+      persistFilterState();
+      updateSectionVisibility();
+      updateFilterButtonState();
+      syncFilterUi();
+    }
 
   function setColumnCondition(columnKey, condition) {
     if (!columnKey) {
@@ -1134,11 +1163,16 @@ function createFormatter(config) {
         entry.conditionControl.update(filterState.columnConditions[columnKey]);
       }
     });
-    sectionUiState.forEach((entry, sectionKey) => {
-      if (entry.visibilityCheckbox) {
-        entry.visibilityCheckbox.checked = !filterState.hiddenSections.has(sectionKey);
-      }
-    });
+      sectionUiState.forEach((entry, sectionKey) => {
+        if (entry.visibilityCheckbox) {
+          entry.visibilityCheckbox.checked = !filterState.hiddenSections.has(sectionKey);
+          const ancestorHidden = sectionHasHiddenAncestor(sectionKey);
+          entry.visibilityCheckbox.disabled = ancestorHidden;
+          if (entry.container) {
+            entry.container.classList.toggle('combo-filter-section-option--disabled', ancestorHidden);
+          }
+        }
+      });
     if (filterInterface && filterInterface.hideEmptyCheckbox) {
       filterInterface.hideEmptyCheckbox.checked = Boolean(filterState.hideEmptySections);
     }
@@ -1182,14 +1216,14 @@ function createFormatter(config) {
     if (!value) {
       return;
     }
-    if (value.startsWith('built-in:')) {
-      const key = value.slice('built-in:'.length);
-      const preset = PRESET_DEFINITIONS.find((entry) => entry.key === key);
-      if (preset && typeof preset.state === 'function') {
-        applyPresetState(preset.state());
+      if (value.startsWith('built-in:')) {
+        const key = value.slice('built-in:'.length);
+        const preset = builtInPresets.find((entry) => entry.key === key);
+        if (preset) {
+          applyPresetState(preset.state);
+        }
+        return;
       }
-      return;
-    }
     if (value.startsWith('custom:')) {
       const key = value.slice('custom:'.length);
       const preset = customPresets.find((entry) => entry.key === key);
@@ -1256,41 +1290,54 @@ function createFormatter(config) {
     }
     select.appendChild(placeholder);
 
-    if (PRESET_DEFINITIONS.length) {
-      const builtInGroup = document.createElement('optgroup');
-      builtInGroup.label = 'Built-in presets';
-      PRESET_DEFINITIONS.forEach((preset) => {
-        const option = document.createElement('option');
-        option.value = `built-in:${preset.key}`;
-        option.textContent = preset.name;
-        builtInGroup.appendChild(option);
-      });
-      select.appendChild(builtInGroup);
-    }
+      if (builtInPresets.length) {
+        const builtInGroup = document.createElement('optgroup');
+        builtInGroup.label = 'Built-in presets';
+        builtInPresets.forEach((preset) => {
+          const option = document.createElement('option');
+          option.value = `built-in:${preset.key}`;
+          option.textContent = preset.name;
+          if (preset.description) {
+            option.title = preset.description;
+          }
+          builtInGroup.appendChild(option);
+        });
+        select.appendChild(builtInGroup);
+      }
 
     if (customPresets.length) {
-      const customGroup = document.createElement('optgroup');
-      customGroup.label = 'Custom presets';
-      customPresets.forEach((preset) => {
-        const option = document.createElement('option');
-        option.value = `custom:${preset.key}`;
-        option.textContent = preset.name;
-        customGroup.appendChild(option);
-      });
-      select.appendChild(customGroup);
-    }
+        const customGroup = document.createElement('optgroup');
+        customGroup.label = 'Custom presets';
+        customPresets.forEach((preset) => {
+          const option = document.createElement('option');
+          option.value = `custom:${preset.key}`;
+          option.textContent = preset.name;
+          if (preset.description) {
+            option.title = preset.description;
+          }
+          customGroup.appendChild(option);
+        });
+        select.appendChild(customGroup);
+      }
 
-    if (previousValue && select.querySelector(`option[value="${previousValue}"]`)) {
-      select.value = previousValue;
-    } else {
-      select.value = '';
-      filterInterface.selectedPresetValue = '';
-    }
+      if (previousValue) {
+        select.value = previousValue;
+        if (select.value !== previousValue) {
+          select.value = '';
+        }
+      } else {
+        select.value = '';
+      }
 
-    if (filterInterface.deletePresetButton) {
-      filterInterface.deletePresetButton.disabled = !(previousValue && previousValue.startsWith('custom:'));
+      filterInterface.selectedPresetValue = select.value;
+      placeholder.selected = select.value === '';
+
+      if (filterInterface.deletePresetButton) {
+        filterInterface.deletePresetButton.disabled = !(
+          filterInterface.selectedPresetValue && filterInterface.selectedPresetValue.startsWith('custom:')
+        );
+      }
     }
-  }
 
   function createNumberConditionControl(column) {
     const details = document.createElement('details');
@@ -1556,33 +1603,41 @@ function createFormatter(config) {
 
     if (filterInterface.sectionVisibilityContainer) {
       filterInterface.sectionVisibilityContainer.innerHTML = '';
-      if (!sections.length) {
-        const notice = document.createElement('p');
-        notice.textContent = 'Sections will appear once combo data loads.';
-        filterInterface.sectionVisibilityContainer.appendChild(notice);
-      } else {
-        sections.forEach((section) => {
-          const label = document.createElement('label');
-          label.className = 'combo-filter-section-option';
-          const depth = Number.isFinite(section.depth) ? section.depth : 0;
-          label.style.setProperty('--section-depth', String(depth));
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.checked = !filterState.hiddenSections.has(section.key);
-          checkbox.addEventListener('change', () => {
-            setSectionHidden(section.key, !checkbox.checked);
-          });
-          label.appendChild(checkbox);
-          const labelText = document.createElement('span');
-          labelText.className = 'combo-filter-section-option__label';
-          labelText.textContent = section.label || section.key;
-          label.appendChild(labelText);
-          filterInterface.sectionVisibilityContainer.appendChild(label);
+        if (!sections.length) {
+          const notice = document.createElement('p');
+          notice.textContent = 'Sections will appear once combo data loads.';
+          filterInterface.sectionVisibilityContainer.appendChild(notice);
+        } else {
+          sections.forEach((section) => {
+            const label = document.createElement('label');
+            label.className = 'combo-filter-section-option';
+            const depth = Number.isFinite(section.depth) ? section.depth : 0;
+            label.style.setProperty('--section-depth', String(depth));
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = !filterState.hiddenSections.has(section.key);
+            checkbox.addEventListener('change', () => {
+              setSectionHidden(section.key, !checkbox.checked);
+            });
+            label.appendChild(checkbox);
+            const labelText = document.createElement('span');
+            labelText.className = 'combo-filter-section-option__label';
+            labelText.textContent = section.label || section.key;
+            label.appendChild(labelText);
+            const note = document.createElement('span');
+            note.className = 'combo-filter-section-option__note';
+            note.textContent = 'Enable parent section to edit';
+            label.appendChild(note);
+            filterInterface.sectionVisibilityContainer.appendChild(label);
 
-          sectionUiState.set(section.key, { visibilityCheckbox: checkbox });
-        });
+            sectionUiState.set(section.key, {
+              visibilityCheckbox: checkbox,
+              container: label,
+              parentKey: section.parentKey,
+            });
+          });
+        }
       }
-    }
 
     if (filterInterface.visibilityContainer) {
       filterInterface.visibilityContainer.innerHTML = '';
@@ -1674,11 +1729,16 @@ function createFormatter(config) {
     body.className = 'combo-filter-panel__section-body';
     section.appendChild(heading);
     section.appendChild(body);
-    const setOpen = (open) => {
-      const isOpen = Boolean(open);
-      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-      body.hidden = !isOpen;
-    };
+      const setOpen = (open) => {
+        const isOpen = Boolean(open);
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        body.hidden = !isOpen;
+        if (isOpen) {
+          section.classList.remove('combo-filter-panel__section--collapsed');
+        } else {
+          section.classList.add('combo-filter-panel__section--collapsed');
+        }
+      };
     toggle.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       setOpen(!expanded);
@@ -2172,9 +2232,13 @@ function createFormatter(config) {
   transform: rotate(-135deg);
 }
 
-.combo-filter-panel__section-body {
-  margin-top: 0.75rem;
-}
+  .combo-filter-panel__section-body {
+    margin-top: 0.75rem;
+  }
+
+  .combo-filter-panel__section--collapsed .combo-filter-panel__section-body {
+    display: none;
+  }
 
 .combo-filter-visibility {
   display: flex;
@@ -2195,17 +2259,35 @@ function createFormatter(config) {
   gap: 0.35rem;
 }
 
-.combo-filter-section-option {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  padding-left: calc(0.35rem + 0.85rem * var(--section-depth, 0));
-}
+  .combo-filter-section-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    padding-left: calc(0.35rem + 0.85rem * var(--section-depth, 0));
+  }
 
-.combo-filter-section-option__label {
-  flex: 1;
-}
+  .combo-filter-section-option__label {
+    flex: 1;
+  }
+
+  .combo-filter-section-option__note {
+    display: none;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  .combo-filter-section-option--disabled {
+    opacity: 0.5;
+  }
+
+  .combo-filter-section-option--disabled .combo-filter-section-option__note {
+    display: inline-flex;
+  }
+
+  .combo-filter-section-option input[disabled] {
+    cursor: not-allowed;
+  }
 
 .combo-filter-visibility input[type='checkbox'] {
   width: 1rem;
@@ -2311,21 +2393,37 @@ body.combo-filter-open {
   overflow: hidden;
 }
 
-@media (max-width: 720px) {
-  .combo-filter-panel {
-    padding: 1rem;
+  @media (max-width: 720px) {
+    .combo-filter-panel {
+      padding: 1rem;
+    }
+
+    .combo-filter-button {
+      right: 1rem;
+      bottom: 1rem;
+    }
   }
 
-  .combo-filter-button {
-    right: 1rem;
-    bottom: 1rem;
-  }
-}
+  @media (min-width: 1100px) {
+    .citizen-page-sidebar {
+      position: sticky;
+      top: calc(var(--height-sticky-header, 0px) + 1rem);
+      align-self: flex-start;
+      min-height: calc(100vh - var(--height-sticky-header, 0px) - 1rem);
+      max-height: calc(100vh - var(--height-sticky-header, 0px) - 1rem);
+    }
 
-.combo-section__header:focus-visible,
-.citizen-section-heading[role="button"]:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+    .citizen-page-sidebar #citizen-toc .citizen-menu__card {
+      min-height: calc(100vh - var(--height-sticky-header, 0px) - 2rem);
+      max-height: calc(100vh - var(--height-sticky-header, 0px) - 2rem);
+      overflow: auto;
+    }
+  }
+
+  .combo-section__header:focus-visible,
+  .citizen-section-heading[role="button"]:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
 }
 `;
 
@@ -2450,11 +2548,12 @@ body.combo-filter-open {
       .forEach((heading) => initialiseCitizenSectionHeading(heading));
   };
 
-  const getSources = () => ({
-    source: comboRoot.dataset.source || 'combo-sections.json',
-    formattingSource: comboRoot.dataset.formattingRules || 'combo-formatting-rules.json',
-    tableDefinitionsSource: comboRoot.dataset.tableDefinitions || 'combo-table-definitions.json',
-  });
+    const getSources = () => ({
+      source: comboRoot.dataset.source || 'combo-sections.json',
+      formattingSource: comboRoot.dataset.formattingRules || 'combo-formatting-rules.json',
+      tableDefinitionsSource: comboRoot.dataset.tableDefinitions || 'combo-table-definitions.json',
+      presetDefinitionsSource: comboRoot.dataset.presetDefinitions || 'combo-filter-presets.json',
+    });
 
   const fetchJson = (url, { optional } = {}) =>
     fetch(url).then((response) => {
@@ -3692,7 +3791,7 @@ body.combo-filter-open {
       initialiseCitizenSectionHeadings();
     }
 
-    const { source, formattingSource, tableDefinitionsSource } = getSources();
+    const { source, formattingSource, tableDefinitionsSource, presetDefinitionsSource } = getSources();
 
     Promise.all([
       fetchJson(source),
@@ -3704,8 +3803,12 @@ body.combo-filter-open {
         console.warn('Unable to load table definitions', error);
         return null;
       }),
+      fetchJson(presetDefinitionsSource, { optional: true }).catch((error) => {
+        console.warn('Unable to load preset definitions', error);
+        return null;
+      }),
     ])
-      .then(async ([sections, formattingConfig, tableDefinitions]) => {
+      .then(async ([sections, formattingConfig, tableDefinitions, presetDefinitions]) => {
         if (!Array.isArray(sections)) {
           throw new Error('Invalid combo sections configuration.');
         }
@@ -3728,6 +3831,7 @@ body.combo-filter-open {
         const resolvedSections = applyDescriptionSources(sections, htmlMap);
         const formatText = createFormatter(formattingConfig || { rules: [] });
         const resolvedDefinitions = tableDefinitions || {};
+        builtInPresets = normalisePresetDefinitions(presetDefinitions);
 
         if (!comboRoot) {
           throw new Error('Combo sections root element is missing.');
