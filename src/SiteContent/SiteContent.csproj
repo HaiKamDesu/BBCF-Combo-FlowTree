@@ -38,6 +38,7 @@
     <None Include="reference\\**\\*">
       <Link>reference\\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </None>
+    <Compile Include="BBCF_TAS.cs" />
     <None Include="..\\..\\README.md">
       <Link>README.md</Link>
     </None>
