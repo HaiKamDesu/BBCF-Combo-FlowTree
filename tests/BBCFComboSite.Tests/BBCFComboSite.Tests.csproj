@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\BBCFHelpersAndExtraScripts\BBCFHelpersAndExtraScripts.csproj" />
     <ProjectReference Include="..\..\src\BBCFComboSite\BBCFComboSite.csproj" />
   </ItemGroup>
 
