@@ -2909,18 +2909,85 @@ body.combo-filter-open {
     }
 
     const normalised = csvText.replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '');
-    const lines = normalised
-      .split('\n')
-      .map((line) => line.trimEnd())
-      .filter((line) => line.length);
-    if (!lines.length) {
+    const rows = [];
+    let currentRow = [];
+    let currentValue = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < normalised.length; i += 1) {
+      const char = normalised[i];
+      if (char === '"') {
+        if (inQuotes && normalised[i + 1] === '"') {
+          currentValue += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        currentRow.push(currentValue);
+        currentValue = '';
+      } else if (char === '\n' && !inQuotes) {
+        currentRow.push(currentValue);
+        rows.push(currentRow);
+        currentRow = [];
+        currentValue = '';
+      } else {
+        currentValue += char;
+      }
+    }
+
+    if (currentValue.length || currentRow.length) {
+      currentRow.push(currentValue);
+      rows.push(currentRow);
+    }
+
+    const trimmedRows = rows
+      .map((row) => row.map((value) => value.trimEnd()))
+      .filter((row) => row.some((value) => value !== ''));
+
+    if (!trimmedRows.length) {
       return { headers: [], rows: [] };
     }
 
-    const headers = parseCsvLine(lines[0]).map((header) => header.trim());
-    const rows = lines.slice(1).map((line) => parseCsvLine(line));
+    const [headerRow, ...dataRows] = trimmedRows;
+    const headers = headerRow.map((header) => header.trim());
 
-    return { headers, rows };
+    return { headers, rows: dataRows };
+  };
+
+  const normaliseSpreadsheetCsvUrl = (csvUrl) => {
+    if (typeof csvUrl !== 'string') {
+      return csvUrl;
+    }
+
+    try {
+      const url = new URL(csvUrl);
+      const isGoogleSheet =
+        url.hostname === 'docs.google.com' && url.pathname.startsWith('/spreadsheets/d/');
+      if (!isGoogleSheet) {
+        return csvUrl;
+      }
+
+      const pathSegments = url.pathname.split('/').filter(Boolean);
+      const idIndex = pathSegments.indexOf('d') + 1;
+      const spreadsheetId = pathSegments[idIndex];
+      if (!spreadsheetId) {
+        return csvUrl;
+      }
+      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const gid = hashParams.get('gid');
+
+      const exportParams = new URLSearchParams();
+      exportParams.set('format', 'csv');
+      if (gid) {
+        exportParams.set('gid', gid);
+      }
+
+      return `${url.origin}/spreadsheets/d/${spreadsheetId}/export?${exportParams.toString()}`;
+    } catch (error) {
+      console.warn('Unable to normalise spreadsheet URL', error);
+      return csvUrl;
+    }
   };
 
   const buildColumnLabel = (column) => {
@@ -4516,13 +4583,14 @@ body.combo-filter-open {
           spreadsheetConfig.csvUrl &&
           !Array.isArray(spreadsheetConfig.entries)
         ) {
-          const { headers, rows } = await fetchText(spreadsheetConfig.csvUrl)
+          const csvUrl = normaliseSpreadsheetCsvUrl(spreadsheetConfig.csvUrl);
+          const { headers, rows } = await fetchText(csvUrl)
             .then((csv) => parseCsv(csv))
             .catch((error) => {
               console.warn('Unable to load spreadsheet rows', error);
               return { headers: [], rows: [] };
             });
-          resolvedSpreadsheetConfig = Object.assign({}, spreadsheetConfig, { headers, entries: rows });
+          resolvedSpreadsheetConfig = Object.assign({}, spreadsheetConfig, { headers, entries: rows, csvUrl });
         }
 
         const resolvedSections = applySpreadsheetRows(

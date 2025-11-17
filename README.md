@@ -45,7 +45,9 @@ The `index.html` and `dustloop-assets/` directories at the repository root remai
 
 The combo tables can now pull rows straight from a published Google Sheet (or any CSV endpoint) instead of hard-coding the full `rows` array in `combo-sections.json`.
 
-1. Publish or share your sheet and copy a CSV export URL (for Google Sheets this usually ends with `export?format=csv`).
+1. Publish or share your sheet and copy a CSV export URL (for Google Sheets this usually ends with `export?format=csv`). Standard
+   "view" links like `https://docs.google.com/spreadsheets/d/<id>/edit#gid=0` also work—the page will convert them to the CSV
+   export endpoint automatically.
 2. Update `combo-spreadsheet-source.json`:
 
    ```json
