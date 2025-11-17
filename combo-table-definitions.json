@@ -138,7 +138,18 @@
         "type": "enum",
         "description": "An ambiguous check of the community, this being set to true means it is what is believed to be your optimal combo for the situation you got into."
       }
-    ]
+    ],
+    "columnWidths": {
+      "Damage": "best-fit",
+      "Heat Gain": "best-fit",
+      "Minimum Heat": "best-fit",
+      "Graviton Cost": "best-fit",
+      "Graviton Gain": "best-fit",
+      "Minimum OD": "best-fit",
+      "Minimum OD Time": "best-fit",
+      "Route": "28rem",
+      "Extra Notes": "24rem"
+    }
   },
   "standard": {
     "extends": "default"

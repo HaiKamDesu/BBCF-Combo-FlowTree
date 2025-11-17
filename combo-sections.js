@@ -2237,6 +2237,16 @@ function createFormatter(config) {
   display: none !important;
 }
 
+.combo-column--fit {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.combo-column--fixed {
+  word-break: break-word;
+  white-space: normal;
+}
+
 .combo-table__empty-row td {
   text-align: center;
   font-style: italic;
@@ -3062,6 +3072,57 @@ body.combo-filter-open {
     return '';
   };
 
+  const normaliseColumnWidthSetting = (value) => {
+    if (value == null) {
+      return null;
+    }
+
+    if (value && typeof value === 'object' && value.mode) {
+      const mode = String(value.mode).toLowerCase();
+      if (mode === 'fit') {
+        return { mode: 'fit' };
+      }
+      if (mode === 'fixed') {
+        return value.value ? { mode: 'fixed', value: String(value.value) } : null;
+      }
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const lower = trimmed.toLowerCase();
+      if (lower === 'best-fit' || lower === 'best fit' || lower === 'fit' || lower === 'fit-content') {
+        return { mode: 'fit' };
+      }
+      return { mode: 'fixed', value: trimmed };
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return { mode: 'fixed', value: `${value}px` };
+    }
+
+    return null;
+  };
+
+  const buildColumnWidthLookup = (tableDefinition) => {
+    const lookup = new Map();
+    if (!tableDefinition || !tableDefinition.columnWidths || typeof tableDefinition.columnWidths !== 'object') {
+      return lookup;
+    }
+
+    Object.entries(tableDefinition.columnWidths).forEach(([key, value]) => {
+      const normalisedKey = String(key || '').trim().toLowerCase();
+      const widthSetting = normaliseColumnWidthSetting(value);
+      if (normalisedKey && widthSetting) {
+        lookup.set(normalisedKey, widthSetting);
+      }
+    });
+
+    return lookup;
+  };
+
   const buildColumnLookup = (columns) => {
     const lookup = new Map();
     (columns || []).forEach((column) => {
@@ -3080,14 +3141,17 @@ body.combo-filter-open {
     description: `Unformatted column sourced from "${header}"`,
   });
 
-  const buildColumnsFromHeaders = (headers, baseColumns) => {
+  const buildColumnsFromHeaders = (headers, baseColumns, widthLookup = new Map()) => {
     const lookup = buildColumnLookup(baseColumns);
     return headers.map((header) => {
-      const match = lookup.get(String(header || '').trim().toLowerCase());
-      if (match) {
-        return match;
+      const normalisedHeader = String(header || '').trim();
+      const match = lookup.get(normalisedHeader.toLowerCase());
+      const resolved = match ? Object.assign({}, match) : createDefaultColumnDefinition(normalisedHeader);
+      const width = widthLookup.get(normalisedHeader.toLowerCase());
+      if (width && typeof resolved === 'object') {
+        resolved.width = width;
       }
-      return createDefaultColumnDefinition(header);
+      return resolved;
     });
   };
 
@@ -3154,8 +3218,10 @@ body.combo-filter-open {
       sectionsWithIndex.set(resolveSectionLabel(section, index).toLowerCase(), { section, index });
     });
 
+    const tableDefinition = resolveDefinitionForType(tableDefinitions || {}, tableType) || {};
     const baseColumns = resolveBaseColumns(null, tableDefinitions, tableType);
-    const columns = buildColumnsFromHeaders(headers, baseColumns);
+    const widthLookup = buildColumnWidthLookup(tableDefinition);
+    const columns = buildColumnsFromHeaders(headers, baseColumns, widthLookup);
 
     const rowsBySection = new Map();
     records.forEach((record) => {
@@ -3362,6 +3428,25 @@ body.combo-filter-open {
     const merged = current.concat(additions).filter((value) => value);
 
     return Array.from(new Set(merged)).join(' ');
+  };
+
+  const applyColumnWidthConfig = (cell, widthConfig, { isHeader = false } = {}) => {
+    if (!cell || !widthConfig) {
+      return;
+    }
+
+    if (widthConfig.mode === 'fit') {
+      cell.classList.add('combo-column--fit');
+      return;
+    }
+
+    if (widthConfig.mode === 'fixed' && widthConfig.value) {
+      cell.style.width = widthConfig.value;
+      cell.style.maxWidth = widthConfig.value;
+      if (!isHeader) {
+        cell.classList.add('combo-column--fixed');
+      }
+    }
   };
 
   const normaliseHeaderConfig = (column) => {
@@ -4063,14 +4148,15 @@ body.combo-filter-open {
       th.className = 'headerSort';
       th.setAttribute('tabindex', '0');
       th.setAttribute('role', 'columnheader button');
-        let html;
-        const columnConfig = {
-          autoFormat: undefined,
-          headerColor: null,
-          valueColor: null,
+      let html;
+      const columnConfig = {
+        autoFormat: undefined,
+        headerColor: null,
+        valueColor: null,
         header: null,
         sort: null,
         sortDisabled: false,
+        width: null,
       };
 
       if (tableConfig.columnsHtml) {
@@ -4137,48 +4223,55 @@ body.combo-filter-open {
           ) {
             columnConfig.sortDisabled = true;
           }
-        } else {
-          html = normaliseCell(column, formatText, defaultAutoFormat);
-        }
 
-        columnConfig.autoFormat = autoFormatOverride;
-      }
-
-        const columnInfo = resolveColumnInfo(column, columnIndex);
-        columnConfig.key = columnInfo.key;
-        columnConfig.label = columnInfo.label;
-        if (columnInfo.filterType) {
-          columnConfig.filterType = columnInfo.filterType;
-      }
-      if (columnInfo.filterEnabled !== undefined) {
-        columnConfig.filterEnabled = columnInfo.filterEnabled;
-      }
-      registerColumnDefinition(columnConfig);
-
-      columnConfigs.push(columnConfig);
-
-      th.innerHTML = html;
-      if (columnConfig.headerColor) {
-        th.style.color = columnConfig.headerColor;
-      }
-      if (columnConfig.header) {
-        applyHeaderConfig(th, columnConfig.header);
-      }
-        if (columnConfig.sort) {
-          if (columnConfig.sort.sorter) {
-            th.dataset.sorter = columnConfig.sort.sorter;
+          const widthSetting = column && typeof column === 'object' ? column.width || column.columnWidth : null;
+          const widthConfig = normaliseColumnWidthSetting(widthSetting);
+          if (widthConfig) {
+            columnConfig.width = widthConfig;
           }
-          if (columnConfig.sort.initialOrder) {
-            th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
-          }
-        }
-        const sortHint = columnConfig.sortDisabled ? '' : 'Click to sort';
-        applyTooltip(th, buildTooltip(columnConfig.description, sortHint));
-        if (columnConfig.key) {
-          th.dataset.columnKey = columnConfig.key;
-        }
-      headerRow.appendChild(th);
-    });
+      } else {
+        html = normaliseCell(column, formatText, defaultAutoFormat);
+      }
+
+      columnConfig.autoFormat = autoFormatOverride;
+    }
+
+    const columnInfo = resolveColumnInfo(column, columnIndex);
+    columnConfig.key = columnInfo.key;
+    columnConfig.label = columnInfo.label;
+    if (columnInfo.filterType) {
+      columnConfig.filterType = columnInfo.filterType;
+    }
+    if (columnInfo.filterEnabled !== undefined) {
+      columnConfig.filterEnabled = columnInfo.filterEnabled;
+    }
+    registerColumnDefinition(columnConfig);
+
+    columnConfigs.push(columnConfig);
+
+    th.innerHTML = html;
+    applyColumnWidthConfig(th, columnConfig.width, { isHeader: true });
+    if (columnConfig.headerColor) {
+      th.style.color = columnConfig.headerColor;
+    }
+    if (columnConfig.header) {
+      applyHeaderConfig(th, columnConfig.header);
+    }
+    if (columnConfig.sort) {
+      if (columnConfig.sort.sorter) {
+        th.dataset.sorter = columnConfig.sort.sorter;
+      }
+      if (columnConfig.sort.initialOrder) {
+        th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
+      }
+    }
+    const sortHint = columnConfig.sortDisabled ? '' : '(Click to sort)';
+    applyTooltip(th, buildTooltip(columnConfig.description, sortHint));
+    if (columnConfig.key) {
+      th.dataset.columnKey = columnConfig.key;
+    }
+    headerRow.appendChild(th);
+  });
 
     thead.appendChild(headerRow);
     table.appendChild(thead);
@@ -4227,6 +4320,7 @@ body.combo-filter-open {
           cell.dataset.columnKey = columnConfig.key;
           cellValues[columnConfig.key] = filterValue;
         }
+        applyColumnWidthConfig(cell, columnConfig.width);
         registerColumnValue(columnConfig, filterValue);
         tr.appendChild(cell);
       }
@@ -4365,6 +4459,8 @@ body.combo-filter-open {
 
   const createDatabaseSectionConfig = (sections) => {
     const combinedRows = [];
+    let columns = null;
+    let columnsHtml = null;
 
     sections.forEach((section) => {
       (section.rows || []).forEach((row) => {
@@ -4373,6 +4469,14 @@ body.combo-filter-open {
         }
         combinedRows.push([...row]);
       });
+
+      if (!columns && Array.isArray(section.columns)) {
+        columns = section.columns;
+      }
+
+      if (!columnsHtml && Array.isArray(section.columns_html)) {
+        columnsHtml = section.columns_html;
+      }
     });
 
     return {
@@ -4380,6 +4484,8 @@ body.combo-filter-open {
       headline_id: 'Combo_Database',
       descriptions: [],
       rows: combinedRows,
+      columns: columns || undefined,
+      columns_html: columnsHtml || undefined,
       table: { type: 'database' },
     };
   };
