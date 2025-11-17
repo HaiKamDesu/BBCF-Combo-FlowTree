@@ -2830,24 +2830,69 @@ body.combo-filter-open {
       spreadsheetSource: comboRoot.dataset.spreadsheetSource || 'combo-spreadsheet-source.json',
     });
 
-  const fetchJson = (url, { optional } = {}) =>
-    fetch(url).then((response) => {
-      if (!response.ok) {
-        if (optional) {
-          return null;
-        }
-        throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  const buildCorsProxyUrl = (url) => {
+    try {
+      const baseOrigin =
+        typeof window !== 'undefined' && window.location
+          ? new URL(window.location.href).origin
+          : 'http://localhost';
+      const parsed = new URL(url, baseOrigin);
+      if (parsed.origin === baseOrigin || /corsproxy\.io$/.test(parsed.hostname)) {
+        return null;
       }
-      return response.json();
-    });
 
-  const fetchText = (url) =>
-    fetch(url).then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${url}: ${response.status}`);
+      return `https://corsproxy.io/?${encodeURIComponent(parsed.href)}`;
+    } catch (error) {
+      console.warn('Unable to build CORS proxy URL', error);
+      return null;
+    }
+  };
+
+  const fetchWithCorsFallback = (url, parseResponse, { optional } = {}) => {
+    const attemptFetch = (target) =>
+      fetch(target).then((response) => {
+        if (!response.ok) {
+          if (optional) {
+            return null;
+          }
+          throw new Error(`Failed to fetch ${target}: ${response.status}`);
+        }
+        return parseResponse(response);
+      });
+
+    return attemptFetch(url).catch((error) => {
+      const proxyUrl = buildCorsProxyUrl(url);
+      if (proxyUrl) {
+        console.warn(`Retrying ${url} via CORS proxy`, error);
+        return attemptFetch(proxyUrl).catch((proxyError) => {
+          if (optional) {
+            return null;
+          }
+          throw proxyError;
+        });
       }
-      return response.text();
+
+      if (optional) {
+        return null;
+      }
+
+      throw error;
     });
+  };
+
+  const fetchJson = (url, { optional } = {}) =>
+    fetchWithCorsFallback(
+      url,
+      (response) => response.json(),
+      { optional },
+    );
+
+  const fetchText = (url, { optional } = {}) =>
+    fetchWithCorsFallback(
+      url,
+      (response) => response.text(),
+      { optional },
+    );
 
   const DESCRIPTION_SOURCE_KEYS = ['descriptions', 'descriptions_html'];
 
@@ -2975,10 +3020,11 @@ body.combo-filter-open {
         return csvUrl;
       }
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
-      const gid = hashParams.get('gid');
+      const searchParams = url.searchParams || new URLSearchParams();
+      const gid = hashParams.get('gid') || searchParams.get('gid');
 
       const exportParams = new URLSearchParams();
-      exportParams.set('format', 'csv');
+      exportParams.set('format', searchParams.get('format') || 'csv');
       if (gid) {
         exportParams.set('gid', gid);
       }
@@ -4620,6 +4666,9 @@ body.combo-filter-open {
         console.error(error);
         if (comboRoot) {
           comboRoot.textContent = 'Unable to load combo tables.';
+        }
+        if (databaseRoot) {
+          databaseRoot.textContent = 'Unable to load combo tables.';
         }
       });
   };
