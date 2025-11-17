@@ -131,6 +131,7 @@ function createFormatter(config) {
   const sectionRegistry = new Map();
   let tableMetadataList = [];
   let tableMetadataMap = new WeakMap();
+  let resetBaselineState = null;
   let filterState = createDefaultFilterState();
   let customPresets = [];
   let builtInPresets = [];
@@ -138,13 +139,25 @@ function createFormatter(config) {
   let isFilterPanelOpen = false;
   const columnUiState = new Map();
   const sectionUiState = new Map();
+  let tocObserver = null;
+  let hasStoredFilterState = false;
 
-  function createDefaultFilterState() {
+  function createEmptyFilterState() {
     return {
       hiddenColumns: new Set(),
       hiddenSections: new Set(),
       columnConditions: {},
       hideEmptySections: false,
+    };
+  }
+
+  function createDefaultFilterState() {
+    const base = resetBaselineState || {};
+    return {
+      hiddenColumns: new Set(base.hiddenColumns || []),
+      hiddenSections: new Set(base.hiddenSections || []),
+      columnConditions: Object.assign({}, base.columnConditions || {}),
+      hideEmptySections: Boolean(base.hideEmptySections),
     };
   }
 
@@ -310,6 +323,7 @@ function createFormatter(config) {
 
   function loadFilterStateFromStorage() {
     const stored = readStorage(FILTER_STATE_STORAGE_KEY);
+    hasStoredFilterState = Boolean(stored);
     if (!stored) {
       return createDefaultFilterState();
     }
@@ -396,13 +410,14 @@ function createFormatter(config) {
         }
 
         const description = definition.description ? String(definition.description).trim() : '';
-        return {
-          key,
-          name,
-          description,
-          state: cloneFilterState(definition.state),
-        };
-      })
+          return {
+            key,
+            name,
+            description,
+            defaultReset: Boolean(definition.defaultReset),
+            state: cloneFilterState(definition.state),
+          };
+        })
       .filter((preset) => preset && preset.key && preset.name);
   }
 
@@ -573,6 +588,9 @@ function createFormatter(config) {
     if (columnConfig.filterEnabled === false) {
       existing.filterEnabled = false;
     }
+    if (columnConfig.description && !existing.description) {
+      existing.description = columnConfig.description;
+    }
     columnRegistry.set(columnConfig.key, existing);
   }
 
@@ -684,6 +702,21 @@ function createFormatter(config) {
     return elements;
   }
 
+  function ensureTocObserver() {
+    if (tocObserver || typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+    const tocList = document.getElementById('mw-panel-toc-list');
+    if (!tocList) {
+      return;
+    }
+    tocObserver = new MutationObserver(() => {
+      refreshNavigationElements();
+      updateSectionVisibility();
+    });
+    tocObserver.observe(tocList, { childList: true, subtree: true });
+  }
+
   function resolveHeadingKey(heading, fallbackIndex) {
     if (!heading) {
       return `section-${fallbackIndex}`;
@@ -744,6 +777,7 @@ function createFormatter(config) {
       stack.push({ key, level });
       order += 1;
     });
+    ensureTocObserver();
   }
 
   function resetColumnMetadata() {
@@ -1004,6 +1038,19 @@ function createFormatter(config) {
     }
   }
 
+  function refreshNavigationElements() {
+    sectionRegistry.forEach((entry) => {
+      if (!entry || !entry.key) {
+        return;
+      }
+      const resolvedNavElements = resolveSectionNavigationElements(entry.key) || [];
+      if (!resolvedNavElements.length) {
+        return;
+      }
+      entry.navElements = new Set(resolvedNavElements);
+    });
+  }
+
   function sectionHasHiddenAncestor(sectionKey) {
     if (!sectionKey) {
       return false;
@@ -1043,6 +1090,8 @@ function createFormatter(config) {
   function updateSectionVisibility() {
     const shouldHideEmpty = Boolean(filterState.hideEmptySections);
     const visibleRowCounts = shouldHideEmpty ? countVisibleRowsBySection() : new Map();
+    ensureTocObserver();
+    refreshNavigationElements();
       sectionRegistry.forEach((entry) => {
         const elements = entry.elements ? Array.from(entry.elements).filter(Boolean) : [];
         const navElements = entry.navElements ? Array.from(entry.navElements).filter(Boolean) : [];
@@ -1339,12 +1388,15 @@ function createFormatter(config) {
       }
     }
 
-  function createNumberConditionControl(column) {
-    const details = document.createElement('details');
-    details.className = 'combo-filter-condition';
-    const summary = document.createElement('summary');
-    summary.textContent = column.label;
-    details.appendChild(summary);
+    function createNumberConditionControl(column) {
+      const details = document.createElement('details');
+      details.className = 'combo-filter-condition';
+      const summary = document.createElement('summary');
+      summary.textContent = column.label;
+      if (column.description) {
+        summary.title = column.description;
+      }
+      details.appendChild(summary);
 
     const body = document.createElement('div');
     body.className = 'combo-filter-condition__body';
@@ -1414,12 +1466,15 @@ function createFormatter(config) {
     };
   }
 
-  function createTextConditionControl(column) {
-    const details = document.createElement('details');
-    details.className = 'combo-filter-condition';
-    const summary = document.createElement('summary');
-    summary.textContent = column.label;
-    details.appendChild(summary);
+    function createTextConditionControl(column) {
+      const details = document.createElement('details');
+      details.className = 'combo-filter-condition';
+      const summary = document.createElement('summary');
+      summary.textContent = column.label;
+      if (column.description) {
+        summary.title = column.description;
+      }
+      details.appendChild(summary);
 
     const body = document.createElement('div');
     body.className = 'combo-filter-condition__body';
@@ -1487,12 +1542,15 @@ function createFormatter(config) {
     };
   }
 
-  function createEnumConditionControl(column) {
-    const details = document.createElement('details');
-    details.className = 'combo-filter-condition';
-    const summary = document.createElement('summary');
-    summary.textContent = column.label;
-    details.appendChild(summary);
+    function createEnumConditionControl(column) {
+      const details = document.createElement('details');
+      details.className = 'combo-filter-condition';
+      const summary = document.createElement('summary');
+      summary.textContent = column.label;
+      if (column.description) {
+        summary.title = column.description;
+      }
+      details.appendChild(summary);
 
     const body = document.createElement('div');
     body.className = 'combo-filter-condition__body';
@@ -1646,11 +1704,14 @@ function createFormatter(config) {
         notice.textContent = 'Columns will appear once combo data loads.';
         filterInterface.visibilityContainer.appendChild(notice);
       } else {
-        columns.forEach((column) => {
-          const label = document.createElement('label');
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.checked = !filterState.hiddenColumns.has(column.key);
+          columns.forEach((column) => {
+            const label = document.createElement('label');
+            if (column.description) {
+              label.title = column.description;
+            }
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = !filterState.hiddenColumns.has(column.key);
           checkbox.addEventListener('change', () => {
             setColumnHidden(column.key, !checkbox.checked);
           });
@@ -3468,12 +3529,11 @@ body.combo-filter-open {
       th.className = 'headerSort';
       th.setAttribute('tabindex', '0');
       th.setAttribute('role', 'columnheader button');
-      th.setAttribute('title', 'Sort ascending');
-      let html;
-      const columnConfig = {
-        autoFormat: undefined,
-        headerColor: null,
-        valueColor: null,
+        let html;
+        const columnConfig = {
+          autoFormat: undefined,
+          headerColor: null,
+          valueColor: null,
         header: null,
         sort: null,
         sortDisabled: false,
@@ -3515,6 +3575,10 @@ body.combo-filter-open {
             columnConfig.headerColor = headerColor;
           }
 
+          if (typeof column.description === 'string' && column.description.trim()) {
+            columnConfig.description = column.description.trim();
+          }
+
           const valueColor =
             column.value_text_color ||
             column.valueTextColor ||
@@ -3546,11 +3610,11 @@ body.combo-filter-open {
         columnConfig.autoFormat = autoFormatOverride;
       }
 
-      const columnInfo = resolveColumnInfo(column, columnIndex);
-      columnConfig.key = columnInfo.key;
-      columnConfig.label = columnInfo.label;
-      if (columnInfo.filterType) {
-        columnConfig.filterType = columnInfo.filterType;
+        const columnInfo = resolveColumnInfo(column, columnIndex);
+        columnConfig.key = columnInfo.key;
+        columnConfig.label = columnInfo.label;
+        if (columnInfo.filterType) {
+          columnConfig.filterType = columnInfo.filterType;
       }
       if (columnInfo.filterEnabled !== undefined) {
         columnConfig.filterEnabled = columnInfo.filterEnabled;
@@ -3566,17 +3630,23 @@ body.combo-filter-open {
       if (columnConfig.header) {
         applyHeaderConfig(th, columnConfig.header);
       }
-      if (columnConfig.sort) {
-        if (columnConfig.sort.sorter) {
-          th.dataset.sorter = columnConfig.sort.sorter;
+        if (columnConfig.sort) {
+          if (columnConfig.sort.sorter) {
+            th.dataset.sorter = columnConfig.sort.sorter;
+          }
+          if (columnConfig.sort.initialOrder) {
+            th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
+          }
         }
-        if (columnConfig.sort.initialOrder) {
-          th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
+        if (columnConfig.description) {
+          const hint = columnConfig.sortDisabled ? '' : ' (click to sort)';
+          th.setAttribute('title', `${columnConfig.description}${hint}`.trim());
+        } else {
+          th.setAttribute('title', 'Sort ascending');
         }
-      }
-      if (columnConfig.key) {
-        th.dataset.columnKey = columnConfig.key;
-      }
+        if (columnConfig.key) {
+          th.dataset.columnKey = columnConfig.key;
+        }
       headerRow.appendChild(th);
     });
 
@@ -3832,6 +3902,14 @@ body.combo-filter-open {
         const formatText = createFormatter(formattingConfig || { rules: [] });
         const resolvedDefinitions = tableDefinitions || {};
         builtInPresets = normalisePresetDefinitions(presetDefinitions);
+        const defaultPreset = builtInPresets.find((preset) => preset.defaultReset);
+        if (defaultPreset) {
+          resetBaselineState = serialiseFilterState(defaultPreset.state || createDefaultFilterState());
+          if (!hasStoredFilterState) {
+            filterState = cloneFilterState(defaultPreset.state);
+            persistFilterState();
+          }
+        }
 
         if (!comboRoot) {
           throw new Error('Combo sections root element is missing.');

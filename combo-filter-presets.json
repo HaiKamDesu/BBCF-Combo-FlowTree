@@ -1,5 +1,17 @@
 [
   {
+    "key": "default-view",
+    "name": "Default view",
+    "description": "Baseline view used when resetting filters.",
+    "defaultReset": true,
+    "state": {
+      "hideEmptySections": false,
+      "hiddenColumns": ["example"],
+      "hiddenSections": [],
+      "columnConditions": {}
+    }
+  },
+  {
     "key": "overdrive",
     "name": "Overdrive Combos",
     "description": "Show only combos flagged as Overdrive-only routes.",
