@@ -1461,15 +1461,14 @@ function createFormatter(config) {
     }
     const select = filterInterface.presetSelect;
     const previousValue = filterInterface.selectedPresetValue || '';
+    const desiredValue = previousValue || defaultPresetValue || '';
     select.innerHTML = '';
 
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.textContent = 'Choose a preset';
     placeholder.disabled = true;
-    if (!previousValue) {
-      placeholder.selected = true;
-    }
+    placeholder.selected = !desiredValue;
     select.appendChild(placeholder);
 
       if (builtInPresets.length) {
@@ -1502,17 +1501,13 @@ function createFormatter(config) {
         select.appendChild(customGroup);
       }
 
-      if (previousValue) {
-        select.value = previousValue;
-        if (select.value !== previousValue) {
-          select.value = '';
-        }
-      } else {
-        select.value = '';
-      }
+      const resolvedValue = desiredValue && select.querySelector(`option[value="${desiredValue}"]`)
+        ? desiredValue
+        : '';
 
-      filterInterface.selectedPresetValue = select.value;
-      placeholder.selected = select.value === '';
+      select.value = resolvedValue;
+      filterInterface.selectedPresetValue = resolvedValue;
+      placeholder.selected = resolvedValue === '';
 
       if (filterInterface.deletePresetButton) {
         filterInterface.deletePresetButton.disabled = !(
@@ -2618,9 +2613,10 @@ body.combo-filter-open {
   }
 
   .view-toggle {
-    margin: 1rem auto 1.25rem;
+    margin: 1rem auto 1.1rem;
     display: inline-flex;
     align-items: stretch;
+    width: min(100%, 22rem);
     border: 1px solid var(--color-border, rgba(255, 255, 255, 0.25));
     border-radius: 999px;
     overflow: hidden;
@@ -2633,10 +2629,12 @@ body.combo-filter-open {
     border: 0;
     background: transparent;
     color: inherit;
-    padding: 0.65rem 1.35rem;
+    padding: 0.6rem 1.1rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     cursor: pointer;
+    flex: 1 1 0;
+    text-align: center;
     transition: background 150ms ease-in-out, color 150ms ease-in-out;
   }
 
@@ -2655,7 +2653,8 @@ body.combo-filter-open {
   }
 
   #database-view-root {
-    margin-top: 1rem;
+    margin: 1rem 0 0;
+    width: 100%;
   }
 
   #database-view-root[hidden] {
@@ -2674,12 +2673,27 @@ body.combo-filter-open {
     display: block;
   }
 
+  body.database-view-active #combo-database-root {
+    width: 100%;
+  }
+
+  body.database-view-active #combo-database-root .wikitable {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+  }
+
   .combo-section.combo-section--database .combo-section__header {
     cursor: default;
   }
 
   .combo-section--database .combo-section__indicator {
     display: none;
+  }
+
+  .combo-section--database {
+    margin: 0;
+    padding: 0;
   }
 
   .combo-section--database .combo-section__content {
@@ -4037,20 +4051,18 @@ body.combo-filter-open {
   const createDatabaseSectionConfig = (sections) => {
     const combinedRows = [];
 
-    sections.forEach((section, index) => {
-      const sectionLabel = resolveSectionLabel(section, index);
+    sections.forEach((section) => {
       (section.rows || []).forEach((row) => {
         if (!Array.isArray(row)) {
           return;
         }
-        combinedRows.push([sectionLabel, ...row]);
+        combinedRows.push([...row]);
       });
     });
 
     return {
       anchor: 'Combo_Database',
       headline_id: 'Combo_Database',
-      title: { text: 'Combo Database', wrap: 'b' },
       descriptions: [],
       rows: combinedRows,
       table: { type: 'database' },
@@ -4064,15 +4076,10 @@ body.combo-filter-open {
     tableDefinitions,
     sectionIndex = 0,
   ) => {
-    const sectionContainer = document.createElement('section');
+    const sectionContainer = document.createElement('div');
     sectionContainer.className = 'combo-section combo-section--database';
     sectionContainer.dataset.sectionIndex = String(sectionIndex);
     const sectionLabel = resolveSectionLabel(section, sectionIndex);
-
-    const header = createHeader(section, formatText, defaultAutoFormat);
-    header.classList.add('combo-section__header');
-    header.setAttribute('role', 'heading');
-    header.setAttribute('aria-level', '3');
 
     const baseId = (section && (section.headline_id || section.anchor)) || 'combo-database';
     const sectionKey = String(baseId);
@@ -4084,36 +4091,14 @@ body.combo-filter-open {
       hasStandaloneContent: true,
     });
 
-    const contentId = `${String(baseId).replace(/\s+/g, '-')}-content`;
-    header.setAttribute('aria-controls', contentId);
-    header.setAttribute('aria-expanded', 'true');
-
-    const content = document.createElement('div');
-    content.className = 'combo-section__content';
-    content.id = contentId;
-
-    const descriptions = createDescriptions(section, formatText, defaultAutoFormat);
-    if (descriptions && descriptions.childNodes && descriptions.childNodes.length) {
-      content.appendChild(descriptions);
-    }
-
     const table = createTable(section, formatText, defaultAutoFormat, tableDefinitions, sectionIndex);
     if (table) {
       const metadata = tableMetadataMap.get(table);
       if (metadata) {
         metadata.sectionKey = sectionKey;
       }
-      content.appendChild(table);
+      sectionContainer.appendChild(table);
     }
-
-    sectionContainer.appendChild(header);
-    sectionContainer.appendChild(content);
-
-    const spacer = document.createElement('div');
-    spacer.className = 'combo-section__spacer';
-    spacer.setAttribute('aria-hidden', 'true');
-    spacer.style.height = '0.875rem';
-    sectionContainer.appendChild(spacer);
 
     return sectionContainer;
   };
