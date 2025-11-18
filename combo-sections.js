@@ -2276,7 +2276,7 @@ function createFormatter(config) {
   overflow-y: hidden;
   position: sticky;
   top: var(--height-sticky-header, 0px);
-  z-index: 15;
+  z-index: 30;
   padding: 0;
   margin: 0 0 0.35rem;
   height: var(--combo-table-scrollbar-height, 12px);
@@ -2322,23 +2322,46 @@ function createFormatter(config) {
 }
 
 
-/* Sticky header row for combo tables */
+/* Header background inside the real table (non-sticky) */
 .combo-table-scroll table thead th,
 .combo-table-scroll table thead td {
   background: var(--color-surface-2, rgba(14, 17, 25, 0.98));
 }
 
-/* Force sticky on THs even if the wiki theme sets something else */
-.combo-table-scroll table thead th {
-  position: sticky !important;
-  top: var(
-    --combo-table-header-offset,
-    calc(
-      var(--height-sticky-header, 0px)
-      + var(--combo-table-scrollbar-height, 12px)
-    )
-  );
-  z-index: 10;
+/* Do NOT try to use native sticky on thead inside the overflow container */
+.combo-table-scroll table thead {
+  position: static;
+}
+
+/* ===== Floating cloned header ===== */
+
+.combo-table-header-wrapper {
+  position: fixed;          /* Positioned via JS */
+  z-index: 25;              /* Above table content */
+  display: none;            /* Only visible when over its table */
+  pointer-events: none;     /* Wrapper itself doesn’t eat events */
+  overflow: hidden;         /* Clip header to the table/card width */
+  background: var(--color-surface-2, rgba(14, 17, 25, 0.98)); /* Hide table behind */
+}
+
+.combo-table-header-wrapper--active {
+  display: block;
+}
+
+.combo-table-header-table {
+  /* Match main table layout as closely as possible */
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;   /* Same as wikitable */
+  pointer-events: auto;        /* Clicking cells (sort arrows) still works */
+  margin: 0;
+}
+
+/* Same background as normal header */
+.combo-table-header-table thead th,
+.combo-table-header-table thead td {
+  background: var(--color-surface-2, rgba(14, 17, 25, 0.98));
 }
 
 
@@ -4619,12 +4642,29 @@ body::-webkit-scrollbar {
     tableMetadataMap.set(table, metadata);
     tableMetadataList.push(metadata);
 
-    if (!(window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.tablesorter === 'function')) {
-      enableNativeTableSorting(table, columnConfigs);
-    }
+      if (!(window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.tablesorter === 'function')) {
+          enableNativeTableSorting(table, columnConfigs);
+      }
 
-    const topScroll = document.createElement('div');
-    topScroll.className = 'combo-table-scroll combo-table-scroll--top';
+      // --- Floating header clone (for both Guide view and Database view) ---
+      const originalThead = table.tHead;
+      let headerWrapper = null;
+      let headerTable = null;
+
+      if (originalThead) {
+          headerWrapper = document.createElement('div');
+          headerWrapper.className = 'combo-table-header-wrapper';
+
+          headerTable = document.createElement('table');
+          headerTable.className = `${table.className} combo-table-header-table`;
+
+          const clonedThead = originalThead.cloneNode(true);
+          headerTable.appendChild(clonedThead);
+          headerWrapper.appendChild(headerTable);
+      }
+
+      const topScroll = document.createElement('div');
+      topScroll.className = 'combo-table-scroll combo-table-scroll--top';
     const spacer = document.createElement('div');
     spacer.className = 'combo-table-scroll__spacer';
     topScroll.appendChild(spacer);
@@ -4633,23 +4673,106 @@ body::-webkit-scrollbar {
     scrollContainer.className = 'combo-table-scroll combo-table-scroll--main';
     scrollContainer.appendChild(table);
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'combo-table-wrapper';
-    wrapper.appendChild(topScroll);
-    wrapper.appendChild(scrollContainer);
-
-    const refreshSpacerWidth = syncHorizontalScrollbars(table, topScroll, scrollContainer);
-    applyScrollbarMeasurements(wrapper, topScroll, scrollContainer, table);
-
-    const refreshScrollState = () => {
-      if (typeof refreshSpacerWidth === 'function') {
-        refreshSpacerWidth();
+      const wrapper = document.createElement('div');
+      wrapper.className = 'combo-table-wrapper';
+      wrapper.appendChild(topScroll);
+      if (headerWrapper) {
+          wrapper.appendChild(headerWrapper);
       }
-      applyScrollbarMeasurements(wrapper, topScroll, scrollContainer, table);
+      wrapper.appendChild(scrollContainer);
+
+
+        const refreshSpacerWidth = syncHorizontalScrollbars(table, topScroll, scrollContainer);
+        applyScrollbarMeasurements(wrapper, topScroll, scrollContainer, table);
+
+        // Keep the floating header positioned, visible, and width-synced
+      const syncFloatingHeader = () => {
+          if (!headerWrapper || !headerTable || !originalThead) {
+              return;
+          }
+
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const barRect = topScroll.getBoundingClientRect();
+          const headerRect = originalThead.getBoundingClientRect();
+          const tableRect = table.getBoundingClientRect();
+
+          // The line where the header should "freeze":
+          // just under the custom X scrollbar
+          const headerOffset = barRect.bottom;
+
+          const headerHeight = headerRect.height || 0;
+
+          // Match wrapper/table horizontal position & width
+          headerWrapper.style.width = `${wrapperRect.width}px`;
+          headerWrapper.style.left = `${wrapperRect.left}px`;
+          headerTable.style.width = `${tableRect.width}px`;
+
+          // NOTE: we do NOT set headerWrapper.style.height here.
+          // Its height is purely the header row height, so no extra dark gap.
+
+          // Only show cloned header when:
+          // 1) the real header has scrolled up to (or past) the freeze line, and
+          // 2) the table still extends below that line (we haven't scrolled past it).
+          const withinVerticalRange =
+              headerRect.top <= headerOffset &&
+              wrapperRect.bottom - headerHeight >= headerOffset;
+
+          if (withinVerticalRange) {
+              headerWrapper.classList.add('combo-table-header-wrapper--active');
+              headerWrapper.style.top = `${headerOffset}px`;
+              // Hide original header so we don't see two at once
+              originalThead.style.visibility = 'hidden';
+          } else {
+              headerWrapper.classList.remove('combo-table-header-wrapper--active');
+              headerWrapper.style.top = '';
+              originalThead.style.visibility = '';
+          }
+
+          // Horizontal sync with the main scroll container
+          const scrollLeft = scrollContainer.scrollLeft;
+          headerTable.style.transform = `translateX(-${scrollLeft}px)`;
+
+          // Column width/height sync for seamless swap
+          const baseCells = originalThead.querySelectorAll('th,td');
+          const cloneCells = headerTable.querySelectorAll('th,td');
+          const count = Math.min(baseCells.length, cloneCells.length);
+          for (let i = 0; i < count; i += 1) {
+              const width = baseCells[i].getBoundingClientRect().width;
+              cloneCells[i].style.width = `${width}px`;
+              if (headerHeight) {
+                  cloneCells[i].style.height = `${headerHeight}px`;
+              }
+          }
+      };
+
+        if (headerWrapper && headerTable) {
+            window.addEventListener('scroll', syncFloatingHeader);
+            window.addEventListener('resize', syncFloatingHeader);
+            scrollContainer.addEventListener('scroll', () => {
+                const scrollLeft = scrollContainer.scrollLeft;
+                headerTable.style.transform = `translateX(-${scrollLeft}px)`;
+            });
+            // first paint
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(syncFloatingHeader);
+            } else {
+                syncFloatingHeader();
+            }
+        }
+
+        const refreshScrollState = () => {
+            if (typeof refreshSpacerWidth === 'function') {
+                refreshSpacerWidth();
+            }
+            applyScrollbarMeasurements(wrapper, topScroll, scrollContainer, table);
+            if (headerWrapper && headerTable) {
+                syncFloatingHeader();
+            }
+        };
+
+        return { table, wrapper, refreshScrollState };
     };
 
-    return { table, wrapper, refreshScrollState };
-  };
 
   const createSection = (section, formatText, defaultAutoFormat, tableDefinitions, index) => {
     const sectionContainer = document.createElement('section');
