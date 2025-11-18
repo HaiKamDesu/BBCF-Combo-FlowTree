@@ -2272,21 +2272,15 @@ function createFormatter(config) {
 
 /* TOP BAR: custom X scrollbar only, no vertical scroll */
 .combo-table-scroll--top {
+  scrollbar-color: #494d63 #252933;
   overflow-x: auto;
   overflow-y: hidden;
   position: sticky;
   top: var(--combo-table-scrollbar-offset, var(--height-sticky-header, 0px));
   z-index: 30;
   padding: 0;
-  margin: 0 0 0.35rem;
-  height: var(--combo-table-scrollbar-height, 12px);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.06),
-    rgba(255, 255, 255, 0.03)
-  );
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  margin: 0 0 0rem;
+  height: 15px;
 }
 
 /* MAIN SCROLL: table lives here – horizontal scroll only */
@@ -2391,7 +2385,6 @@ function createFormatter(config) {
 .combo-table-scroll--main::-webkit-scrollbar:vertical {
   width: 0 !important;   /* Chrome/Edge/Safari: no vertical bar */
 }
-
 
 .combo-table__empty-row td {
   text-align: center;
@@ -4665,13 +4658,13 @@ body::-webkit-scrollbar {
 
       const topScroll = document.createElement('div');
       topScroll.className = 'combo-table-scroll combo-table-scroll--top';
-    const spacer = document.createElement('div');
-    spacer.className = 'combo-table-scroll__spacer';
-    topScroll.appendChild(spacer);
+      const spacer = document.createElement('div');
+      spacer.className = 'combo-table-scroll__spacer';
+      topScroll.appendChild(spacer);
 
-    const scrollContainer = document.createElement('div');
-    scrollContainer.className = 'combo-table-scroll combo-table-scroll--main';
-    scrollContainer.appendChild(table);
+      const scrollContainer = document.createElement('div');
+      scrollContainer.className = 'combo-table-scroll combo-table-scroll--main';
+      scrollContainer.appendChild(table);
 
       const wrapper = document.createElement('div');
       wrapper.className = 'combo-table-wrapper';
