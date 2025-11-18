@@ -1934,7 +1934,7 @@ function createFormatter(config) {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       setOpen(!expanded);
     });
-    setOpen(true);
+    setOpen(false);
     return { section, body, toggle, setOpen };
   }
 

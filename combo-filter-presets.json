@@ -5,28 +5,42 @@
     "description": "Baseline view used when resetting filters.",
     "defaultReset": true,
     "state": {
+      "hideEmptySections": true,
+      "hiddenColumns": [
+        "id",
+        "verified",
+        "meter-gain",
+        "minimum-meter",
+        "graviton-cost",
+        "graviton-gain",
+        "extra-notes",
+        "minimum-od",
+        "is-counter-hit",
+        "is-overdrive-combo",
+        "has-overdrive-cancel",
+        "corner-carry",
+        "has-rapid",
+        "is-optimal",
+        "does-not-work-on",
+        "from"
+      ],
+      "hiddenSections": [],
+      "columnConditions": {
+      }
+    }
+  },
+  {
+    "key": "full-view",
+    "name": "Full view",
+    "description": "This view gives you everything the page has to offer, without any filters or hidden columns.",
+    "defaultReset": true,
+    "state": {
       "hideEmptySections": false,
       "hiddenColumns": [
-        "ID",
-        "Verified",
-        "Meter Gain",
-        "Minimum Meter",
-        "Graviton Cost",
-        "Graviton Gain",
-        "Extra Notes",
-        "Minimum OD",
-        "Is Counter Hit",
-        "Is Overdrive Combo",
-        "Has Overdrive Cancel",
-        "Corner Carry",
-        "Has Rapid",
-        "Is Optimal",
-        "Does not work on",
-        "From" ],
-      "hiddenSections":[],
-      "columnConditions":
-        {
-        }
+      ],
+      "hiddenSections": [],
+      "columnConditions": {
+      }
     }
   },
   {
@@ -41,7 +55,7 @@
         "is-overdrive-combo": {
           "type": "enum",
           "mode": "include",
-          "values": ["yes", "true", "1", "✔", "✓"]
+          "values": [ "No", "yes", "true", "1", "✔", "✓" ]
         }
       }
     }
@@ -58,7 +72,7 @@
         "has-rapid": {
           "type": "enum",
           "mode": "include",
-          "values": ["yes", "true", "1", "✔", "✓"]
+          "values": [ "yes", "true", "1", "✔", "✓" ]
         }
       }
     }
@@ -75,7 +89,7 @@
         "has-overdrive-cancel": {
           "type": "enum",
           "mode": "include",
-          "values": ["yes", "true", "1", "✔", "✓"]
+          "values": [ "yes", "true", "1", "✔", "✓" ]
         }
       }
     }
