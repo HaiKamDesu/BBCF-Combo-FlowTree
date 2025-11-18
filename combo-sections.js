@@ -2275,7 +2275,7 @@ function createFormatter(config) {
   overflow-x: auto;
   overflow-y: hidden;
   position: sticky;
-  top: var(--height-sticky-header, 0px);
+  top: var(--combo-table-scrollbar-offset, var(--height-sticky-header, 0px));
   z-index: 30;
   padding: 0;
   margin: 0 0 0.35rem;
@@ -4697,8 +4697,8 @@ body::-webkit-scrollbar {
           const tableRect = table.getBoundingClientRect();
 
           // The line where the header should "freeze":
-          // just under the custom X scrollbar
-          const headerOffset = barRect.bottom;
+          // aka top of page
+          const headerOffset = 0;
 
           const headerHeight = headerRect.height || 0;
 
@@ -4743,6 +4743,14 @@ body::-webkit-scrollbar {
                   cloneCells[i].style.height = `${headerHeight}px`;
               }
           }
+
+          const floatingHeaderRect = headerWrapper.getBoundingClientRect();
+
+          // Scrollbar should sit right below frozen header
+          topScroll.style.setProperty(
+              "--combo-table-scrollbar-offset",
+              `${floatingHeaderRect.height}px`
+          );
       };
 
         if (headerWrapper && headerTable) {
