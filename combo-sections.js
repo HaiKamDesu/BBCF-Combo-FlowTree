@@ -2260,23 +2260,24 @@ function createFormatter(config) {
 .combo-table-wrapper {
   position: relative;
   width: 100%;
+  --combo-table-scrollbar-height: 12px;
 }
 
 .combo-table-scroll {
   width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   scrollbar-gutter: stable;
 }
 
 .combo-table-scroll--top {
   position: sticky;
-  top: calc(var(--height-sticky-header, 0px) + 0.35rem);
+  top: var(--height-sticky-header, 0px);
   z-index: 15;
+  padding: 0;
+  margin: 0 0 0.25rem;
+  height: var(--combo-table-scrollbar-height, 12px);
   background: var(--color-surface-2, rgba(14, 17, 25, 0.92));
-  padding-bottom: 0.1rem;
-  margin-bottom: 0.35rem;
-  height: var(--combo-table-scrollbar-height, 1.2rem);
 }
 
 .combo-table-scroll__spacer {
@@ -2284,7 +2285,7 @@ function createFormatter(config) {
 }
 
 .combo-table-scroll--main {
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
 }
 
 .combo-table-scroll table {
@@ -2300,9 +2301,7 @@ function createFormatter(config) {
 
 .combo-table-scroll table thead th {
   position: sticky;
-  top: calc(
-    var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 1.2rem) + 0.45rem
-  );
+  top: calc(var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 12px));
   z-index: 10;
 }
 
@@ -4256,7 +4255,8 @@ body.combo-filter-open {
 
     const spacer = topScroll.querySelector('.combo-table-scroll__spacer');
     const updateSpacerWidth = () => {
-      const scrollWidth = table.scrollWidth || table.getBoundingClientRect().width;
+      const scrollWidth =
+        mainScroll.scrollWidth || table.scrollWidth || table.getBoundingClientRect().width;
       if (spacer) {
         spacer.style.width = `${scrollWidth}px`;
       }
@@ -4284,6 +4284,33 @@ body.combo-filter-open {
     updateSpacerWidth();
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(updateSpacerWidth);
+    }
+
+    topScroll.scrollLeft = mainScroll.scrollLeft;
+  };
+
+  const applyScrollbarMeasurements = (wrapper, topScroll, mainScroll) => {
+    if (!wrapper || !topScroll || !mainScroll) {
+      return;
+    }
+
+    const update = () => {
+      const scrollbarHeight = Math.max(0, mainScroll.offsetHeight - mainScroll.clientHeight);
+      const effectiveHeight = scrollbarHeight || 12;
+      const value = `${effectiveHeight}px`;
+      wrapper.style.setProperty('--combo-table-scrollbar-height', value);
+      topScroll.style.setProperty('--combo-table-scrollbar-height', value);
+      mainScroll.style.setProperty('--combo-table-scrollbar-height', value);
+    };
+
+    update();
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(update);
+      observer.observe(mainScroll);
+    }
+    window.addEventListener('resize', update);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(update);
     }
   };
 
@@ -4533,6 +4560,7 @@ body.combo-filter-open {
     wrapper.appendChild(scrollContainer);
 
     syncHorizontalScrollbars(table, topScroll, scrollContainer);
+    applyScrollbarMeasurements(wrapper, topScroll, scrollContainer);
 
     return { table, wrapper };
   };
