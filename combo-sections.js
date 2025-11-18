@@ -2093,7 +2093,7 @@ function createFormatter(config) {
 
     const style = document.createElement('style');
     style.id = 'combo-section-styles';
-    style.textContent = `
+      style.textContent = `
 .citizen-section-heading[role="button"],
 .citizen-subsection-heading[role="button"],
 .combo-section__header {
@@ -2257,21 +2257,23 @@ function createFormatter(config) {
   white-space: normal;
 }
 
-.combo-table-wrapper {
-  position: relative;
-  width: 100%;
-  --combo-table-scrollbar-height: 12px;
-}
+  .combo-table-wrapper {
+    position: relative;
+    width: 100%;
+    --combo-table-scrollbar-height: 12px;
+  }
 
+  /* Base wrapper for both scroll areas */
 .combo-table-scroll {
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
   scrollbar-gutter: stable both-edges;
   position: relative;
 }
 
+/* TOP BAR: custom X scrollbar only, no vertical scroll */
 .combo-table-scroll--top {
+  overflow-x: auto;
+  overflow-y: hidden;
   position: sticky;
   top: var(--height-sticky-header, 0px);
   z-index: 15;
@@ -2287,33 +2289,58 @@ function createFormatter(config) {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
+/* MAIN SCROLL: table lives here – horizontal scroll only */
+.combo-table-scroll--main {
+  overflow-x: auto;
+  /* clip = like hidden, but not a scroll container vertically,
+     so there is never a Y scrollbar on this element */
+  overflow-y: clip;
+  margin-bottom: 0.25rem;
+}
+
 .combo-table-scroll__spacer {
   height: 1px;
 }
 
-.combo-table-scroll--main {
-  margin-bottom: 0.25rem;
-}
-
+/* Ensure the *table itself* is never a scroll container */
 .combo-table-scroll table {
   width: max-content;
   min-width: 100%;
   table-layout: auto;
+
+  /* Kill any Citizen/Dustloop overrides on tables */
+  display: table !important;
+  max-height: none !important;
+  overflow-y: visible !important;
 }
 
+/* Extra safety for wikitable styling specifically */
+.combo-table-scroll table.wikitable {
+  display: table !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+
+/* Sticky header row for combo tables */
 .combo-table-scroll table thead th,
 .combo-table-scroll table thead td {
   background: var(--color-surface-2, rgba(14, 17, 25, 0.98));
 }
 
+/* Force sticky on THs even if the wiki theme sets something else */
 .combo-table-scroll table thead th {
-  position: sticky;
+  position: sticky !important;
   top: var(
     --combo-table-header-offset,
-    calc(var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 12px))
+    calc(
+      var(--height-sticky-header, 0px)
+      + var(--combo-table-scrollbar-height, 12px)
+    )
   );
   z-index: 10;
 }
+
 
 .combo-table-scroll::-webkit-scrollbar {
   height: 0.75rem;
@@ -2332,6 +2359,16 @@ function createFormatter(config) {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
+
+/* Hide any vertical scrollbar UI on the main table scroller */
+.combo-table-scroll--main {
+  scrollbar-width: none; /* Firefox: no vertical scrollbar UI */
+}
+
+.combo-table-scroll--main::-webkit-scrollbar:vertical {
+  width: 0 !important;   /* Chrome/Edge/Safari: no vertical bar */
+}
+
 
 .combo-table__empty-row td {
   text-align: center;
@@ -2769,14 +2806,12 @@ body.combo-filter-open {
     display: block;
   }
 
-  body.database-view-active #combo-database-root {
-    width: 100%;
-  }
-
   body.database-view-active #combo-database-root .wikitable {
     margin-left: 0;
     margin-right: 0;
-    width: 100%;
+    /* DO NOT force width: 100% here.
+       Let .combo-table-scroll decide the table width (max-content)
+       so horizontal overflow lives in the scroll container we control. */
   }
 
   .combo-section.combo-section--database .combo-section__header {
@@ -2795,6 +2830,15 @@ body.combo-filter-open {
   .combo-section--database .combo-section__content {
     margin-top: 0.5rem;
   }
+
+      /* Hide vertical scrollbar UI for this page */
+body {
+  scrollbar-width: none;                /* Firefox */
+}
+
+body::-webkit-scrollbar {
+  width: 0 !important;                  /* Chrome / Edge / Safari */
+}
 `;
 
     if (document.head) {
