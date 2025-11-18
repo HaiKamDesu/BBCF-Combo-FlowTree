@@ -2266,8 +2266,8 @@ function createFormatter(config) {
 .combo-table-scroll {
   width: 100%;
   overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-gutter: stable;
+  overflow-y: hidden;
+  scrollbar-gutter: stable both-edges;
 }
 
 .combo-table-scroll--top {
@@ -2301,7 +2301,10 @@ function createFormatter(config) {
 
 .combo-table-scroll table thead th {
   position: sticky;
-  top: calc(var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 12px));
+  top: var(
+    --combo-table-header-offset,
+    calc(var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 12px))
+  );
   z-index: 10;
 }
 
@@ -4250,7 +4253,7 @@ body.combo-filter-open {
 
   const syncHorizontalScrollbars = (table, topScroll, mainScroll) => {
     if (!table || !topScroll || !mainScroll) {
-      return;
+      return () => {};
     }
 
     const spacer = topScroll.querySelector('.combo-table-scroll__spacer');
@@ -4287,6 +4290,18 @@ body.combo-filter-open {
     }
 
     topScroll.scrollLeft = mainScroll.scrollLeft;
+
+    return updateSpacerWidth;
+  };
+
+  const getRootPixelValue = (variableName) => {
+    if (typeof getComputedStyle !== 'function' || !document || !document.documentElement) {
+      return 0;
+    }
+
+    const value = getComputedStyle(document.documentElement).getPropertyValue(variableName);
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : 0;
   };
 
   const applyScrollbarMeasurements = (wrapper, topScroll, mainScroll) => {
@@ -4298,9 +4313,14 @@ body.combo-filter-open {
       const scrollbarHeight = Math.max(0, mainScroll.offsetHeight - mainScroll.clientHeight);
       const effectiveHeight = scrollbarHeight || 12;
       const value = `${effectiveHeight}px`;
+      const headerOffset = getRootPixelValue('--height-sticky-header') + effectiveHeight;
+      const headerValue = `${headerOffset}px`;
       wrapper.style.setProperty('--combo-table-scrollbar-height', value);
       topScroll.style.setProperty('--combo-table-scrollbar-height', value);
       mainScroll.style.setProperty('--combo-table-scrollbar-height', value);
+      wrapper.style.setProperty('--combo-table-header-offset', headerValue);
+      topScroll.style.setProperty('--combo-table-header-offset', headerValue);
+      mainScroll.style.setProperty('--combo-table-header-offset', headerValue);
     };
 
     update();
@@ -4559,10 +4579,17 @@ body.combo-filter-open {
     wrapper.appendChild(topScroll);
     wrapper.appendChild(scrollContainer);
 
-    syncHorizontalScrollbars(table, topScroll, scrollContainer);
+    const refreshSpacerWidth = syncHorizontalScrollbars(table, topScroll, scrollContainer);
     applyScrollbarMeasurements(wrapper, topScroll, scrollContainer);
 
-    return { table, wrapper };
+    const refreshScrollState = () => {
+      if (typeof refreshSpacerWidth === 'function') {
+        refreshSpacerWidth();
+      }
+      applyScrollbarMeasurements(wrapper, topScroll, scrollContainer);
+    };
+
+    return { table, wrapper, refreshScrollState };
   };
 
   const createSection = (section, formatText, defaultAutoFormat, tableDefinitions, index) => {
@@ -4603,12 +4630,19 @@ body.combo-filter-open {
       content.appendChild(descriptions);
     }
 
-    const { table, wrapper } = createTable(section, formatText, defaultAutoFormat, tableDefinitions, index) || {};
+    const { table, wrapper, refreshScrollState } =
+      createTable(section, formatText, defaultAutoFormat, tableDefinitions, index) || {};
     if (table && wrapper) {
       content.appendChild(wrapper);
       const metadata = tableMetadataMap.get(table);
       if (metadata) {
         metadata.sectionKey = sectionKey;
+      }
+      if (typeof refreshScrollState === 'function') {
+        refreshScrollState();
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(refreshScrollState);
+        }
       }
     }
 
@@ -4718,7 +4752,7 @@ body.combo-filter-open {
       hasStandaloneContent: true,
     });
 
-    const { table, wrapper } =
+    const { table, wrapper, refreshScrollState } =
       createTable(section, formatText, defaultAutoFormat, tableDefinitions, sectionIndex) || {};
     if (table && wrapper) {
       const metadata = tableMetadataMap.get(table);
@@ -4726,6 +4760,12 @@ body.combo-filter-open {
         metadata.sectionKey = sectionKey;
       }
       sectionContainer.appendChild(wrapper);
+      if (typeof refreshScrollState === 'function') {
+        refreshScrollState();
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(refreshScrollState);
+        }
+      }
     }
 
     return sectionContainer;
