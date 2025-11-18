@@ -4654,6 +4654,47 @@ body::-webkit-scrollbar {
           const clonedThead = originalThead.cloneNode(true);
           headerTable.appendChild(clonedThead);
           headerWrapper.appendChild(headerTable);
+
+          // NEW: forward events from floating header to real header
+          const originalHeaderRow = originalThead.rows && originalThead.rows[0];
+          const clonedHeaderRow = clonedThead.rows && clonedThead.rows[0];
+
+          if (originalHeaderRow && clonedHeaderRow) {
+              const originalCells = Array.from(originalHeaderRow.cells);
+              const clonedCells = Array.from(clonedHeaderRow.cells);
+              const count = Math.min(originalCells.length, clonedCells.length);
+
+              for (let i = 0; i < count; i += 1) {
+                  const baseCell = originalCells[i];
+                  const cloneCell = clonedCells[i];
+
+                  // Make the floating header obviously interactive
+                  cloneCell.style.cursor = baseCell.style.cursor || 'pointer';
+                  cloneCell.setAttribute('tabindex', baseCell.getAttribute('tabindex') || '0');
+                  cloneCell.setAttribute('role', baseCell.getAttribute('role') || 'columnheader');
+
+                  // Click on floating header = click on real header
+                  cloneCell.addEventListener('click', (event) => {
+                      event.preventDefault();
+                      baseCell.click();          // triggers tablesorter *or* enableNativeTableSorting
+                      // Optionally resync floating header immediately:
+                      if (typeof syncFloatingHeader === 'function') {
+                          syncFloatingHeader();
+                      }
+                  });
+
+                  // Keyboard sorting (Enter / Space) on floating header
+                  cloneCell.addEventListener('keydown', (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          baseCell.click();
+                          if (typeof syncFloatingHeader === 'function') {
+                              syncFloatingHeader();
+                          }
+                      }
+                  });
+              }
+          }
       }
 
       const topScroll = document.createElement('div');
@@ -4725,17 +4766,55 @@ body::-webkit-scrollbar {
           const scrollLeft = scrollContainer.scrollLeft;
           headerTable.style.transform = `translateX(-${scrollLeft}px)`;
 
-          // Column width/height sync for seamless swap
           const baseCells = originalThead.querySelectorAll('th,td');
           const cloneCells = headerTable.querySelectorAll('th,td');
           const count = Math.min(baseCells.length, cloneCells.length);
           for (let i = 0; i < count; i += 1) {
-              const width = baseCells[i].getBoundingClientRect().width;
-              cloneCells[i].style.width = `${width}px`;
+              const baseCell = baseCells[i];
+              const cloneCell = cloneCells[i];
+
+              // Width/height sync
+              const width = baseCell.getBoundingClientRect().width;
+              cloneCell.style.width = `${width}px`;
               if (headerHeight) {
-                  cloneCells[i].style.height = `${headerHeight}px`;
+                  cloneCell.style.height = `${headerHeight}px`;
+              }
+
+              // NEW: sort-state + accessibility sync
+              // Tablesorter-style classes
+              cloneCell.classList.toggle(
+                  'headerSortUp',
+                  baseCell.classList.contains('headerSortUp'),
+              );
+              cloneCell.classList.toggle(
+                  'headerSortDown',
+                  baseCell.classList.contains('headerSortDown'),
+              );
+
+              // aria-sort
+              const ariaSort = baseCell.getAttribute('aria-sort');
+              if (ariaSort != null) {
+                  cloneCell.setAttribute('aria-sort', ariaSort);
+              } else {
+                  cloneCell.removeAttribute('aria-sort');
+              }
+
+              // data-sortOrder (used by enableNativeTableSorting)
+              if (baseCell.dataset && baseCell.dataset.sortOrder != null) {
+                  cloneCell.dataset.sortOrder = baseCell.dataset.sortOrder;
+              } else if (cloneCell.dataset) {
+                  delete cloneCell.dataset.sortOrder;
+              }
+
+              // Tooltip/title
+              const title = baseCell.getAttribute('title');
+              if (title != null) {
+                  cloneCell.setAttribute('title', title);
+              } else {
+                  cloneCell.removeAttribute('title');
               }
           }
+
 
           const floatingHeaderRect = headerWrapper.getBoundingClientRect();
 
