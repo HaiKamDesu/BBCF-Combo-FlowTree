@@ -193,10 +193,11 @@ function createFormatter(config) {
     }
   }
 
-  function buildTooltip(description, hint) {
+  function buildTooltip(description, hint, options = {}) {
     const descriptionText = description && String(description).trim();
     const hintText = hint && String(hint).trim();
-    return [descriptionText, hintText].filter(Boolean).join(' ');
+    const separator = options.separator || ' ';
+    return [descriptionText, hintText].filter(Boolean).join(separator);
   }
 
   const safeStorage = (() => {
@@ -898,19 +899,28 @@ function createFormatter(config) {
     });
   }
 
+  function stripLinkSyntax(text) {
+    if (!text) {
+      return text;
+    }
+    return String(text).replace(/\(([^|()]+)\|([^\)]+)\)/g, (match, label) =>
+      label != null ? String(label).trim() : match,
+    );
+  }
+
   function resolveCellText(value, html) {
     if (value == null) {
       return html ? extractTextContent(html) : '';
     }
     if (typeof value === 'string' || typeof value === 'number') {
-      return String(value);
+      return stripLinkSyntax(String(value));
     }
     if (typeof value === 'object') {
       if (value.text != null) {
-        return String(value.text);
+        return stripLinkSyntax(String(value.text));
       }
       if (value.value != null) {
-        return String(value.value);
+        return stripLinkSyntax(String(value.value));
       }
       if (typeof value.html === 'string') {
         return extractTextContent(value.html);
@@ -2237,6 +2247,78 @@ function createFormatter(config) {
   display: none !important;
 }
 
+.combo-column--fit {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.combo-column--fixed {
+  word-break: break-word;
+  white-space: normal;
+}
+
+.combo-table-wrapper {
+  position: relative;
+  width: 100%;
+  --combo-table-scrollbar-height: 12px;
+}
+
+.combo-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-gutter: stable;
+}
+
+.combo-table-scroll--top {
+  position: sticky;
+  top: var(--height-sticky-header, 0px);
+  z-index: 15;
+  padding: 0;
+  margin: 0 0 0.25rem;
+  height: var(--combo-table-scrollbar-height, 12px);
+  background: var(--color-surface-2, rgba(14, 17, 25, 0.92));
+}
+
+.combo-table-scroll__spacer {
+  height: 1px;
+}
+
+.combo-table-scroll--main {
+  margin-bottom: 0.25rem;
+}
+
+.combo-table-scroll table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.combo-table-scroll table thead th,
+.combo-table-scroll table thead td {
+  background: var(--color-surface-2, rgba(14, 17, 25, 0.98));
+}
+
+.combo-table-scroll table thead th {
+  position: sticky;
+  top: calc(var(--height-sticky-header, 0px) + var(--combo-table-scrollbar-height, 12px));
+  z-index: 10;
+}
+
+.combo-table-scroll::-webkit-scrollbar {
+  height: 0.75rem;
+}
+
+.combo-table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+}
+
+.combo-table-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
 .combo-table__empty-row td {
   text-align: center;
   font-style: italic;
@@ -3062,6 +3144,57 @@ body.combo-filter-open {
     return '';
   };
 
+  const normaliseColumnWidthSetting = (value) => {
+    if (value == null) {
+      return null;
+    }
+
+    if (value && typeof value === 'object' && value.mode) {
+      const mode = String(value.mode).toLowerCase();
+      if (mode === 'fit') {
+        return { mode: 'fit' };
+      }
+      if (mode === 'fixed') {
+        return value.value ? { mode: 'fixed', value: String(value.value) } : null;
+      }
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const lower = trimmed.toLowerCase();
+      if (lower === 'best-fit' || lower === 'best fit' || lower === 'fit' || lower === 'fit-content') {
+        return { mode: 'fit' };
+      }
+      return { mode: 'fixed', value: trimmed };
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return { mode: 'fixed', value: `${value}px` };
+    }
+
+    return null;
+  };
+
+  const buildColumnWidthLookup = (tableDefinition) => {
+    const lookup = new Map();
+    if (!tableDefinition || !tableDefinition.columnWidths || typeof tableDefinition.columnWidths !== 'object') {
+      return lookup;
+    }
+
+    Object.entries(tableDefinition.columnWidths).forEach(([key, value]) => {
+      const normalisedKey = String(key || '').trim().toLowerCase();
+      const widthSetting = normaliseColumnWidthSetting(value);
+      if (normalisedKey && widthSetting) {
+        lookup.set(normalisedKey, widthSetting);
+      }
+    });
+
+    return lookup;
+  };
+
   const buildColumnLookup = (columns) => {
     const lookup = new Map();
     (columns || []).forEach((column) => {
@@ -3080,14 +3213,17 @@ body.combo-filter-open {
     description: `Unformatted column sourced from "${header}"`,
   });
 
-  const buildColumnsFromHeaders = (headers, baseColumns) => {
+  const buildColumnsFromHeaders = (headers, baseColumns, widthLookup = new Map()) => {
     const lookup = buildColumnLookup(baseColumns);
     return headers.map((header) => {
-      const match = lookup.get(String(header || '').trim().toLowerCase());
-      if (match) {
-        return match;
+      const normalisedHeader = String(header || '').trim();
+      const match = lookup.get(normalisedHeader.toLowerCase());
+      const resolved = match ? Object.assign({}, match) : createDefaultColumnDefinition(normalisedHeader);
+      const width = widthLookup.get(normalisedHeader.toLowerCase());
+      if (width && typeof resolved === 'object') {
+        resolved.width = width;
       }
-      return createDefaultColumnDefinition(header);
+      return resolved;
     });
   };
 
@@ -3154,8 +3290,10 @@ body.combo-filter-open {
       sectionsWithIndex.set(resolveSectionLabel(section, index).toLowerCase(), { section, index });
     });
 
+    const tableDefinition = resolveDefinitionForType(tableDefinitions || {}, tableType) || {};
     const baseColumns = resolveBaseColumns(null, tableDefinitions, tableType);
-    const columns = buildColumnsFromHeaders(headers, baseColumns);
+    const widthLookup = buildColumnWidthLookup(tableDefinition);
+    const columns = buildColumnsFromHeaders(headers, baseColumns, widthLookup);
 
     const rowsBySection = new Map();
     records.forEach((record) => {
@@ -3322,6 +3460,53 @@ body.combo-filter-open {
     return fragments;
   };
 
+  const formatTextWithLinks = (value, formatText, defaultAutoFormat) => {
+    const linkPattern = /\(([^|()]+)\|([^\)]+)\)/g;
+    const text = value == null ? '' : String(value);
+
+    if (!text) {
+      return '';
+    }
+
+    const hasLinkSyntax = linkPattern.test(text);
+    linkPattern.lastIndex = 0;
+
+    if (!hasLinkSyntax) {
+      return formatText(text, { autoFormat: defaultAutoFormat });
+    }
+
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkPattern.exec(text))) {
+      if (match.index > lastIndex) {
+        const preceding = text.slice(lastIndex, match.index);
+        parts.push(formatText(preceding, { autoFormat: defaultAutoFormat }));
+      }
+
+      const label = match[1] != null ? match[1].trim() : '';
+      const href = match[2] != null ? match[2].trim() : '';
+
+      if (label && href) {
+        const safeLabel = formatText(label, { autoFormat: defaultAutoFormat });
+        const safeHref = escapeHtml(href);
+        parts.push(`<a href="${safeHref}" target="_blank" rel="nofollow">${safeLabel}</a>`);
+      } else {
+        const fallback = text.slice(match.index, linkPattern.lastIndex);
+        parts.push(formatText(fallback, { autoFormat: defaultAutoFormat }));
+      }
+
+      lastIndex = linkPattern.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(formatText(text.slice(lastIndex), { autoFormat: defaultAutoFormat }));
+    }
+
+    return parts.join('');
+  };
+
   const normaliseCell = (value, formatText, defaultAutoFormat) => {
     if (value == null) {
       return '';
@@ -3335,7 +3520,7 @@ body.combo-filter-open {
     }
 
     if (typeof value === 'string' || typeof value === 'number') {
-      return formatText(value, { autoFormat: defaultAutoFormat });
+      return formatTextWithLinks(value, formatText, defaultAutoFormat);
     }
 
     if (typeof value === 'object') {
@@ -3344,9 +3529,8 @@ body.combo-filter-open {
       }
       const autoFormatOverride = resolveAutoFormatPreference(value);
       const text = value.text != null ? value.text : '';
-      return formatText(text, {
-        autoFormat: autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat,
-      });
+      const autoFormat = autoFormatOverride !== undefined ? autoFormatOverride : defaultAutoFormat;
+      return formatTextWithLinks(text, formatText, autoFormat);
     }
 
     return formatText(String(value), { autoFormat: defaultAutoFormat });
@@ -3362,6 +3546,26 @@ body.combo-filter-open {
     const merged = current.concat(additions).filter((value) => value);
 
     return Array.from(new Set(merged)).join(' ');
+  };
+
+  const applyColumnWidthConfig = (cell, widthConfig, { isHeader = false } = {}) => {
+    if (!cell || !widthConfig) {
+      return;
+    }
+
+    if (widthConfig.mode === 'fit') {
+      cell.classList.add('combo-column--fit');
+      return;
+    }
+
+    if (widthConfig.mode === 'fixed' && widthConfig.value) {
+      cell.style.width = widthConfig.value;
+      cell.style.maxWidth = widthConfig.value;
+      cell.style.minWidth = widthConfig.value;
+      if (!isHeader) {
+        cell.classList.add('combo-column--fixed');
+      }
+    }
   };
 
   const normaliseHeaderConfig = (column) => {
@@ -3613,7 +3817,7 @@ body.combo-filter-open {
         }
 
         header.setAttribute('aria-sort', 'none');
-        applyTooltip(header, buildTooltip(config.description, 'Click to sort'));
+        applyTooltip(header, buildTooltip(config.description, 'Click to sort', { separator: ' | ' }));
       });
 
       const activeHeader = headers[columnIndex];
@@ -3628,7 +3832,10 @@ body.combo-filter-open {
           : ascending
           ? 'Sort descending'
           : 'Sort ascending';
-        applyTooltip(activeHeader, buildTooltip(activeConfig.description, toggleHint));
+        applyTooltip(
+          activeHeader,
+          buildTooltip(activeConfig.description, toggleHint, { separator: ' | ' }),
+        );
       }
     };
 
@@ -4041,6 +4248,72 @@ body.combo-filter-open {
     };
   };
 
+  const syncHorizontalScrollbars = (table, topScroll, mainScroll) => {
+    if (!table || !topScroll || !mainScroll) {
+      return;
+    }
+
+    const spacer = topScroll.querySelector('.combo-table-scroll__spacer');
+    const updateSpacerWidth = () => {
+      const scrollWidth =
+        mainScroll.scrollWidth || table.scrollWidth || table.getBoundingClientRect().width;
+      if (spacer) {
+        spacer.style.width = `${scrollWidth}px`;
+      }
+    };
+
+    let syncing = null;
+    const handleScroll = (source, target) => {
+      if (syncing === source) {
+        syncing = null;
+        return;
+      }
+      syncing = source;
+      target.scrollLeft = source.scrollLeft;
+    };
+
+    topScroll.addEventListener('scroll', () => handleScroll(topScroll, mainScroll));
+    mainScroll.addEventListener('scroll', () => handleScroll(mainScroll, topScroll));
+
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(updateSpacerWidth);
+      observer.observe(table);
+    }
+
+    window.addEventListener('resize', updateSpacerWidth);
+    updateSpacerWidth();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(updateSpacerWidth);
+    }
+
+    topScroll.scrollLeft = mainScroll.scrollLeft;
+  };
+
+  const applyScrollbarMeasurements = (wrapper, topScroll, mainScroll) => {
+    if (!wrapper || !topScroll || !mainScroll) {
+      return;
+    }
+
+    const update = () => {
+      const scrollbarHeight = Math.max(0, mainScroll.offsetHeight - mainScroll.clientHeight);
+      const effectiveHeight = scrollbarHeight || 12;
+      const value = `${effectiveHeight}px`;
+      wrapper.style.setProperty('--combo-table-scrollbar-height', value);
+      topScroll.style.setProperty('--combo-table-scrollbar-height', value);
+      mainScroll.style.setProperty('--combo-table-scrollbar-height', value);
+    };
+
+    update();
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(update);
+      observer.observe(mainScroll);
+    }
+    window.addEventListener('resize', update);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(update);
+    }
+  };
+
   const createTable = (section, formatText, defaultAutoFormat, tableDefinitions, sectionIndex) => {
     const tableConfig = resolveTableConfig(section, tableDefinitions);
 
@@ -4063,14 +4336,15 @@ body.combo-filter-open {
       th.className = 'headerSort';
       th.setAttribute('tabindex', '0');
       th.setAttribute('role', 'columnheader button');
-        let html;
-        const columnConfig = {
-          autoFormat: undefined,
-          headerColor: null,
-          valueColor: null,
+      let html;
+      const columnConfig = {
+        autoFormat: undefined,
+        headerColor: null,
+        valueColor: null,
         header: null,
         sort: null,
         sortDisabled: false,
+        width: null,
       };
 
       if (tableConfig.columnsHtml) {
@@ -4137,48 +4411,55 @@ body.combo-filter-open {
           ) {
             columnConfig.sortDisabled = true;
           }
-        } else {
-          html = normaliseCell(column, formatText, defaultAutoFormat);
-        }
 
-        columnConfig.autoFormat = autoFormatOverride;
-      }
-
-        const columnInfo = resolveColumnInfo(column, columnIndex);
-        columnConfig.key = columnInfo.key;
-        columnConfig.label = columnInfo.label;
-        if (columnInfo.filterType) {
-          columnConfig.filterType = columnInfo.filterType;
-      }
-      if (columnInfo.filterEnabled !== undefined) {
-        columnConfig.filterEnabled = columnInfo.filterEnabled;
-      }
-      registerColumnDefinition(columnConfig);
-
-      columnConfigs.push(columnConfig);
-
-      th.innerHTML = html;
-      if (columnConfig.headerColor) {
-        th.style.color = columnConfig.headerColor;
-      }
-      if (columnConfig.header) {
-        applyHeaderConfig(th, columnConfig.header);
-      }
-        if (columnConfig.sort) {
-          if (columnConfig.sort.sorter) {
-            th.dataset.sorter = columnConfig.sort.sorter;
+          const widthSetting = column && typeof column === 'object' ? column.width || column.columnWidth : null;
+          const widthConfig = normaliseColumnWidthSetting(widthSetting);
+          if (widthConfig) {
+            columnConfig.width = widthConfig;
           }
-          if (columnConfig.sort.initialOrder) {
-            th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
-          }
-        }
-        const sortHint = columnConfig.sortDisabled ? '' : 'Click to sort';
-        applyTooltip(th, buildTooltip(columnConfig.description, sortHint));
-        if (columnConfig.key) {
-          th.dataset.columnKey = columnConfig.key;
-        }
-      headerRow.appendChild(th);
-    });
+      } else {
+        html = normaliseCell(column, formatText, defaultAutoFormat);
+      }
+
+      columnConfig.autoFormat = autoFormatOverride;
+    }
+
+    const columnInfo = resolveColumnInfo(column, columnIndex);
+    columnConfig.key = columnInfo.key;
+    columnConfig.label = columnInfo.label;
+    if (columnInfo.filterType) {
+      columnConfig.filterType = columnInfo.filterType;
+    }
+    if (columnInfo.filterEnabled !== undefined) {
+      columnConfig.filterEnabled = columnInfo.filterEnabled;
+    }
+    registerColumnDefinition(columnConfig);
+
+    columnConfigs.push(columnConfig);
+
+    th.innerHTML = html;
+    applyColumnWidthConfig(th, columnConfig.width, { isHeader: true });
+    if (columnConfig.headerColor) {
+      th.style.color = columnConfig.headerColor;
+    }
+    if (columnConfig.header) {
+      applyHeaderConfig(th, columnConfig.header);
+    }
+    if (columnConfig.sort) {
+      if (columnConfig.sort.sorter) {
+        th.dataset.sorter = columnConfig.sort.sorter;
+      }
+      if (columnConfig.sort.initialOrder) {
+        th.dataset.sortInitialOrder = columnConfig.sort.initialOrder;
+      }
+    }
+    const sortHint = columnConfig.sortDisabled ? '' : 'Click to sort';
+    applyTooltip(th, buildTooltip(columnConfig.description, sortHint, { separator: ' | ' }));
+    if (columnConfig.key) {
+      th.dataset.columnKey = columnConfig.key;
+    }
+    headerRow.appendChild(th);
+  });
 
     thead.appendChild(headerRow);
     table.appendChild(thead);
@@ -4227,6 +4508,7 @@ body.combo-filter-open {
           cell.dataset.columnKey = columnConfig.key;
           cellValues[columnConfig.key] = filterValue;
         }
+        applyColumnWidthConfig(cell, columnConfig.width);
         registerColumnValue(columnConfig, filterValue);
         tr.appendChild(cell);
       }
@@ -4262,7 +4544,25 @@ body.combo-filter-open {
       enableNativeTableSorting(table, columnConfigs);
     }
 
-    return table;
+    const topScroll = document.createElement('div');
+    topScroll.className = 'combo-table-scroll combo-table-scroll--top';
+    const spacer = document.createElement('div');
+    spacer.className = 'combo-table-scroll__spacer';
+    topScroll.appendChild(spacer);
+
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'combo-table-scroll combo-table-scroll--main';
+    scrollContainer.appendChild(table);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'combo-table-wrapper';
+    wrapper.appendChild(topScroll);
+    wrapper.appendChild(scrollContainer);
+
+    syncHorizontalScrollbars(table, topScroll, scrollContainer);
+    applyScrollbarMeasurements(wrapper, topScroll, scrollContainer);
+
+    return { table, wrapper };
   };
 
   const createSection = (section, formatText, defaultAutoFormat, tableDefinitions, index) => {
@@ -4303,9 +4603,9 @@ body.combo-filter-open {
       content.appendChild(descriptions);
     }
 
-    const table = createTable(section, formatText, defaultAutoFormat, tableDefinitions, index);
-    if (table) {
-      content.appendChild(table);
+    const { table, wrapper } = createTable(section, formatText, defaultAutoFormat, tableDefinitions, index) || {};
+    if (table && wrapper) {
+      content.appendChild(wrapper);
       const metadata = tableMetadataMap.get(table);
       if (metadata) {
         metadata.sectionKey = sectionKey;
@@ -4365,6 +4665,8 @@ body.combo-filter-open {
 
   const createDatabaseSectionConfig = (sections) => {
     const combinedRows = [];
+    let columns = null;
+    let columnsHtml = null;
 
     sections.forEach((section) => {
       (section.rows || []).forEach((row) => {
@@ -4373,6 +4675,14 @@ body.combo-filter-open {
         }
         combinedRows.push([...row]);
       });
+
+      if (!columns && Array.isArray(section.columns)) {
+        columns = section.columns;
+      }
+
+      if (!columnsHtml && Array.isArray(section.columns_html)) {
+        columnsHtml = section.columns_html;
+      }
     });
 
     return {
@@ -4380,6 +4690,8 @@ body.combo-filter-open {
       headline_id: 'Combo_Database',
       descriptions: [],
       rows: combinedRows,
+      columns: columns || undefined,
+      columns_html: columnsHtml || undefined,
       table: { type: 'database' },
     };
   };
@@ -4406,13 +4718,14 @@ body.combo-filter-open {
       hasStandaloneContent: true,
     });
 
-    const table = createTable(section, formatText, defaultAutoFormat, tableDefinitions, sectionIndex);
-    if (table) {
+    const { table, wrapper } =
+      createTable(section, formatText, defaultAutoFormat, tableDefinitions, sectionIndex) || {};
+    if (table && wrapper) {
       const metadata = tableMetadataMap.get(table);
       if (metadata) {
         metadata.sectionKey = sectionKey;
       }
-      sectionContainer.appendChild(table);
+      sectionContainer.appendChild(wrapper);
     }
 
     return sectionContainer;
